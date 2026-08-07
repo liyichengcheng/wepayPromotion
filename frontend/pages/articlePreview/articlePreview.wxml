@@ -1,0 +1,83 @@
+<view class="page">
+  <view class="search-bar">
+    <view class="search-input">
+      <text class="search-icon">🔍</text>
+      <text class="search-placeholder">搜索文章、作者、话题</text>
+    </view>
+    <view class="search-action">
+      <text>📖</text>
+    </view>
+  </view>
+
+  <view class="article-card">
+    <view class="article-cover">
+      <image class="cover-image" src="http://www.chsl.xyz/xlrz/images/cover.png" mode="aspectFill"></image>
+      <view class="article-tags">
+        <view class="tag tag-blue">真人真事</view>
+      </view>
+    </view>
+    <view class="article-info">
+      <view class="article-title-row">
+        <text class="article-title">穷学渣逆袭：2006湖南高考倒数第一到百万年薪的程序员</text>
+        <view class="enter-btn">10000人已阅读</view>
+      </view>
+      <view class="article-desc">
+        <text>2006年湖南高考理科倒数第一，2022年百万年薪的程序员，没有任何高等学历，家庭背景极穷。这篇文章会讲述这个过程，总结逆袭经验：</text>
+        <text class="highlight-red">能商则商，不商则技，绝不做工。</text>
+        <text>更会通俗易懂讲透一些反普通人常识的底层逻辑：<text class="highlight-red">稀缺高专业岗位本质不看学历，大成本拼学历竞争低专业岗位永无出头之日，吃苦不赚钱，赚钱不吃苦</text>。以下是真人真事的证据:</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="evidence-card">
+    <view class="evidence-title">
+      <text class="evidence-title-text">真人真事证据</text>
+      <text class="evidence-title-hint">（点击图片可放大查看）</text>
+    </view>
+    <view class="evidence-grid">
+      <image 
+        wx:for="{{evidenceImages}}" 
+        wx:key="index" 
+        class="evidence-item" 
+        src="{{item}}" 
+        mode="aspectFill"
+        show-menu-by-longpress="{{false}}"
+        bindtap="previewImage"
+        data-current="{{item}}">
+      </image>
+    </view>
+    <view class="pay-bottom-bar">
+      <view class="pay-btn" bindtap="createPayOrder">
+        <text wx:if="{{!hasReadArticle}}">付款看全文</text>
+        <text wx:else>继续阅读</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 确认支付弹窗 -->
+  <view class="modal-mask" wx:if="{{showPayModal}}" bindtap="closePayModal"></view>
+  <view class="pay-modal" wx:if="{{showPayModal}}">
+    <view class="pay-modal-header">
+      <text class="pay-modal-title">确认支付</text>
+    </view>
+    <view class="pay-modal-body">
+      <view class="pay-info-line">
+        <text class="pay-info-text">您是第</text>
+        <text class="pay-info-num">{{payCount}}</text>
+        <text class="pay-info-text">位读者，定价</text>
+        <text class="pay-info-price">¥{{price}}元</text>
+      </view>
+      <view class="pay-info-sub">
+        <text>每增加1万读者，加1元，最高20元。可转发，不可截图，拍照</text>
+      </view>
+    </view>
+    <view class="pay-modal-footer">
+      <view class="pay-modal-cancel" bindtap="closePayModal">
+        <text>取消</text>
+      </view>
+      <view class="pay-modal-confirm" bindtap="confirmPay">
+        <text>确认支付</text>
+      </view>
+    </view>
+  </view>
+</view>

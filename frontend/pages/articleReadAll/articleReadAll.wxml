@@ -1,0 +1,62 @@
+<view class="page" catchselectstart="preventCopy" catchlongpress="preventCopy">
+  <view class="nav-bar" style="padding-top: {{statusBarHeight}}px;">
+    <view class="nav-content">
+      <view class="nav-back" bindtap="goBack">
+        <text class="back-icon">←</text>
+      </view>
+      <view class="nav-title">全文阅读</view>
+    </view>
+  </view>
+
+  <view class="article-header">
+    <view class="article-title">学渣逆袭：高考倒状元到百万年薪</view>
+  </view>
+
+  <view class="chapter-list">
+    <view class="chapter-item" wx:for="{{chapters}}" wx:key="id" id="chapter-{{item.id}}">
+      <view class="chapter-header">
+        <text class="chapter-title">{{item.title}}</text>
+        <view class="catalog-btn" bindtap="toggleCatalog" wx:if="{{index === 0}}">目录</view>
+      </view>
+      <view class="chapter-content" wx:if="{{item.content}}">
+        <text class="no-select">{{item.content}}</text>
+      </view>
+    </view>
+  </view>
+  <view class="bottom-tip">
+    <text class="bottom-tip-text">禁止截图、录屏</text>
+  </view>
+  <view class="action-bar">
+    <view class="action-item" bindtap="toIncomePage">
+      <view class="action-item-main">
+        <text class="action-icon">💰</text>
+        <text class="action-text">分享赚钱</text>
+      </view>
+      <text class="action-sub">每单返30%，不低于2元</text>
+    </view>
+  </view>
+
+  <!-- 目录弹窗 -->
+  <view class="catalog-mask" wx:if="{{showCatalog}}" bindtap="toggleCatalog"></view>
+  <view class="catalog-panel" wx:if="{{showCatalog}}">
+    <view class="catalog-panel-header">
+      <text class="catalog-panel-title">目录</text>
+      <view class="catalog-close" bindtap="toggleCatalog">×</view>
+    </view>
+    <scroll-view class="catalog-list" scroll-y="true">
+      <view 
+        class="catalog-item" 
+        wx:for="{{chapters}}" 
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="jumpToChapter">
+        <text class="catalog-item-title">{{item.title}}</text>
+      </view>
+      <view class="catalog-divider"></view>
+      <button class="catalog-share-btn" open-type="share">
+        <text class="share-icon">📤</text>
+        <text>分享文章</text>
+      </button>
+    </scroll-view>
+  </view>
+</view>

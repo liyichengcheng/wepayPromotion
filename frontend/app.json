@@ -1,0 +1,21 @@
+{
+  "pages": [
+    "pages/articlePreview/articlePreview",
+    "pages/articleReadAll/articleReadAll",
+    "pages/shareIncome/shareIncome"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTitleText": "学渣逆袭",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f7f8fa"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "permission": {
+    "scope.writePhotosAlbum": {
+      "desc": "保存图片"
+    }
+  }
+}
