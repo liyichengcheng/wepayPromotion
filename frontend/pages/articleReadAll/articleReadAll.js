@@ -33,13 +33,32 @@ Page({
       }
     ]
   },
-  onLoad() {
+  async onLoad() {
     app.banCaptureScreen()
-    const hasReadArticle = wx.getStorageSync("hasReadArticle")
-    if (!hasReadArticle) {
+    let hasAccess = wx.getStorageSync("hasReadArticle")
+
+    if (!hasAccess) {
+      try {
+        await app.waitLogin(5000)
+        const res = await app.$request({
+          url: "/pay/checkStatus",
+          data: { articleId: app.globalData.articleId }
+        })
+        if (res.data.paid) {
+          hasAccess = true
+          wx.setStorageSync("hasReadArticle", true)
+          app.globalData.isPayUnlock = true
+        }
+      } catch (e) {
+        console.error("验证支付状态失败", e)
+      }
+    }
+
+    if (!hasAccess) {
       wx.redirectTo({ url: "/pages/articlePreview/articlePreview" })
       return
     }
+
     const sysInfo = wx.getSystemInfoSync()
     const statusBarHeight = sysInfo.statusBarHeight || 20
     this.setData({ statusBarHeight })
@@ -117,7 +136,7 @@ Page({
     const uid = app.globalData.userId
     return {
       title: "学渣逆袭：高考倒状元到百万年薪",
-      path: `/pages/articlePreview/articlePreview?shareUid=${uid}`,
+      path: app.globalData.shareLink || `/pages/articlePreview/articlePreview?shareUid=${uid}`,
       imageUrl: ""
     }
   }

@@ -1,0 +1,23 @@
+<view class="container">
+  <view class="banner card">
+    <view class="banner-title">📖 付费精品文章</view>
+    <view class="banner-desc">深度好文 · 付费解锁 · 分享拿返佣</view>
+  </view>
+
+  <view class="list">
+    <view
+      class="article-item card"
+      wx:for="{{articleList}}"
+      wx:key="id"
+      bindtap="goDetail"
+      data-id="{{item.id}}"
+    >
+      <view class="item-title">{{item.title}}</view>
+      <view class="item-summary">{{item.summary}}</view>
+      <view class="item-footer">
+        <view class="item-paid">已有 {{item.paidCount}} 人付费</view>
+        <view class="item-price">¥{{item.currentPrice}}</view>
+      </view>
+    </view>
+  </view>
+</view>

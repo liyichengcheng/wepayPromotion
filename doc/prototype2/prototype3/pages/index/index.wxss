@@ -1,0 +1,68 @@
+.container {
+  padding: 24rpx;
+}
+
+.banner {
+  background: linear-gradient(135deg, #07c160 0%, #00a854 100%);
+  color: #fff;
+  margin-bottom: 24rpx;
+}
+
+.banner-title {
+  font-size: 36rpx;
+  font-weight: bold;
+  margin-bottom: 8rpx;
+}
+
+.banner-desc {
+  font-size: 26rpx;
+  opacity: 0.9;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.article-item {
+  padding: 28rpx 24rpx;
+}
+
+.item-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  line-height: 1.5;
+  margin-bottom: 12rpx;
+  color: #1a1a1a;
+}
+
+.item-summary {
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 20rpx;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.item-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 16rpx;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.item-paid {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.item-price {
+  font-size: 36rpx;
+  color: #f53f3f;
+  font-weight: bold;
+}

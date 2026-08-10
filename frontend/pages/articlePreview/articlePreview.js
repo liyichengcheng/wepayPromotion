@@ -4,7 +4,7 @@ Page({
     price: 6,
     payCount: 912,
     progressPercent: 9.12,
-    isPaying: false,
+    isPaying: true,
     hasReadArticle: false,
     showPayModal: true,
     evidenceImages: [
@@ -32,6 +32,18 @@ Page({
 
     const hasReadArticle = wx.getStorageSync("hasReadArticle")
     this.setData({ hasReadArticle: !!hasReadArticle })
+
+    this.refreshPayStatus()
+  },
+
+  async refreshPayStatus() {
+    try {
+      await app.waitLogin(3000)
+      await app.checkPayStatus()
+      this.setData({ hasReadArticle: app.globalData.isPayUnlock })
+    } catch (e) {
+      console.error("刷新支付状态失败", e)
+    }
   },
 
   createPayOrder() {
@@ -83,14 +95,48 @@ Page({
         }
       })
       wx.hideLoading()
-      const payInfo = res.data.payInfo
-      this.wxPay(payInfo)
+      this.wxPay(res.data)
     } catch (err) {
       wx.hideLoading()
       this.setData({ isPaying: false })
       console.error("支付流程错误", err)
       
       if (app.globalData.isDevMode) {
+        wx.showLoading({ title: "重试支付中..." })
+        try {
+          const userId = await app.waitLogin(3000)
+          wx.hideLoading()
+          if (!userId) {
+            wx.showModal({
+              title: '提示',
+              content: '登录失败，请重试',
+              showCancel: false
+            })
+            return
+          }
+          const articleId = app.globalData.articleId || 10001
+          const shareUid = app.globalData.shareUid || ''
+          const payPrice = this.data.price
+          this.setData({ isPaying: true })
+          wx.showLoading({ title: "创建订单" })
+          const retryRes = await app.$request({
+            url: "/pay/createOrder",
+            method: "POST",
+            data: {
+              userId,
+              articleId,
+              payPrice,
+              parentShareUid: shareUid
+            }
+          })
+          wx.hideLoading()
+          this.wxPay(retryRes.data)
+        } catch (retryErr) {
+          wx.hideLoading()
+          this.setData({ isPaying: false })
+          console.error("开发模式支付重试失败", retryErr)
+          wx.showToast({ title: "支付失败，请稍后重试", icon: "none" })
+        }
       } else {
          wx.showToast({ title: "支付服务暂不可用，请稍后重试", icon: "none" })
       }
@@ -101,7 +147,7 @@ Page({
     wx.requestPayment({
       timeStamp: payInfo.timeStamp,
       nonceStr: payInfo.nonceStr,
-      package: payInfo.package,
+      package: payInfo.packageX,
       signType: payInfo.signType,
       paySign: payInfo.paySign,
       success: () => {
@@ -139,7 +185,7 @@ Page({
     const myUid = app.globalData.userId
     return {
       title: "学渣逆袭：高考倒状元到百万年薪",
-      path: `/pages/articlePreview/articlePreview?shareUid=${myUid}`,
+      path: app.globalData.shareLink || `/pages/articlePreview/articlePreview?shareUid=${myUid}`,
       imageUrl: ""
     }
   }

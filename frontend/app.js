@@ -9,7 +9,8 @@ App({
     totalPayUser: 0,
     isLoginReady: false,
     loginCallbacks: [],
-    isDevMode: false
+    isDevMode: false,
+    shareLink: ""
   },
   $request: request,
 
@@ -71,9 +72,11 @@ App({
       wx.setStorageSync("userId", res.data.userId)
       wx.setStorageSync("token", res.data.token)
       this.globalData.userId = res.data.userId
+      this.globalData.shareLink = res.data.shareLink || ""
       this.globalData.isLoginReady = true
       this.globalData.loginCallbacks.forEach(cb => cb(res.data.userId))
       this.globalData.loginCallbacks = []
+      this.checkPayStatus()
     } catch (err) {
       console.log("登录失败，使用本地用户", err)
       const localUserId = wx.getStorageSync("userId") || "local_user_" + Date.now()
@@ -105,6 +108,22 @@ App({
       this.globalData.currentPrice = price
     } catch (e) {
       console.error("获取付费人数失败，使用默认值", e)
+    }
+  },
+
+  async checkPayStatus() {
+    try {
+      const res = await this.$request({
+        url: "/pay/checkStatus",
+        data: { articleId: this.globalData.articleId }
+      })
+      const paid = res.data.paid
+      this.globalData.isPayUnlock = paid
+      if (paid) {
+        wx.setStorageSync("hasReadArticle", true)
+      }
+    } catch (e) {
+      console.error("检查支付状态失败", e)
     }
   }
 })

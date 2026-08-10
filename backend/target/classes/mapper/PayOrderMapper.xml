@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wepay.promotion.mapper.PayOrderMapper">
+
+    <!--
+      分片规则: t_pay_order -> ds${0..3}.t_pay_order_${0..3}
+      分片键: user_id, 算法: HASH_MOD(4)
+
+      ShardingSphere 5.x standard 策略的路由行为:
+      - 带分片键 user_id 的操作:
+        SQL 中逻辑表 t_pay_order → 按 HASH_MOD(4) 精准重写为 ds{N}.t_pay_order_{M}
+        (N,M = user_id.hashCode() % 4)
+      - 仅 SELECT 且缺分片键时 (如按 order_no 查询):
+        ShardingSphere 自动广播到 4 库 × 4 表 = 16 个物理分片,
+        为每个分分别追加库后缀 ds0..3 和表后缀 _0.._3, 合并结果返回
+
+      注意: INSERT/UPDATE/DELETE 缺分片键会抛出路由错误, 必须带 user_id
+    -->
+
+    <!-- 插入: 必须带分片键 user_id → 精准路由, ShardingSphere 自动追加后缀 -->
+    <insert id="insert" parameterType="com.wepay.promotion.entity.PayOrder" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO t_pay_order (order_no, user_id, openid, article_id, pay_price, parent_share_uid, status, prepay_id)
+        VALUES (#{orderNo}, #{userId}, #{openid}, #{articleId}, #{payPrice}, #{parentShareUid}, #{status}, #{prepayId})
+    </insert>
+
+    <!--
+      广播查询: 按订单号查 (无分片键 user_id, ShardingSphere 自动广播 4库×4表)
+      每个物理分片的 SQL 被重写为:
+        SELECT ... FROM ds{N}.t_pay_order_{M} WHERE order_no = ?
+      应用场景: 支付回调时只拿到 out_trade_no, 没有 user_id;
+      查询结果中包含 userId, 后续的 updatePaySuccess 必须携带 user_id 进行精准路由
+    -->
+    <select id="selectByOrderNo" resultType="com.wepay.promotion.entity.PayOrder">
+        SELECT id, order_no, user_id, openid, article_id, pay_price, parent_share_uid,
+               status, prepay_id, transaction_id, pay_time, create_time, update_time
+        FROM t_pay_order WHERE order_no = #{orderNo}
+    </select>
+
+    <!--
+      更新支付成功: 必须带分片键 user_id + order_no → 精准路由
+      逻辑表 t_pay_order → 重写为 ds{N}.t_pay_order_{M} 单分片
+    -->
+    <update id="updatePaySuccess">
+        UPDATE t_pay_order
+        SET status = 1, transaction_id = #{transactionId}, pay_time = #{payTime}
+        WHERE user_id = #{userId} AND order_no = #{orderNo} AND status = 0
+    </update>
+</mapper>

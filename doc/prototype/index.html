@@ -1,0 +1,766 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>付费文章小程序 - Axure原型</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
+        
+        .axure-container {
+            max-width: 400px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .phone-header {
+            background: #07c160;
+            padding: 10px 0;
+            text-align: center;
+            color: #fff;
+            font-size: 14px;
+        }
+        
+        .screen {
+            min-height: 700px;
+            background: #f5f5f5;
+            position: relative;
+        }
+        
+        .nav-bar {
+            background: #fff;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .nav-back { color: #333; font-size: 20px; cursor: pointer; margin-right: 12px; }
+        .nav-title { font-size: 17px; font-weight: 500; flex: 1; text-align: center; }
+        
+        .page {
+            display: none;
+            padding-bottom: 100px;
+        }
+        
+        .page.active { display: block; }
+        
+        .card {
+            background: #fff;
+            margin: 16px;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .card:active { transform: scale(0.98); }
+        
+        .article-cover {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 14px;
+        }
+        
+        .article-title { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 8px; }
+        .article-preview { font-size: 13px; color: #999; line-height: 1.5; margin-bottom: 12px; }
+        
+        .price-tag {
+            color: #ff4d4f;
+            font-weight: 600;
+            font-size: 18px;
+        }
+        
+        .price-unit { font-size: 12px; }
+        .price-value { font-size: 24px; }
+        
+        .buy-btn {
+            background: linear-gradient(135deg, #07c160 0%, #10b981 100%);
+            color: #fff;
+            border: none;
+            border-radius: 22px;
+            padding: 12px 32px;
+            font-size: 15px;
+            font-weight: 500;
+            margin-top: 12px;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        .preview-mask {
+            background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.9) 70%);
+            padding: 40px 16px 20px;
+            margin-top: -40px;
+            text-align: center;
+        }
+        
+        .mask-text {
+            color: #07c160;
+            font-weight: 500;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .mask-desc { color: #999; font-size: 12px; }
+        
+        .commission-info {
+            background: linear-gradient(135deg, #fffbe6 0%, #fff7e6 100%);
+            padding: 16px;
+            margin: 16px;
+            border-radius: 12px;
+            border: 1px solid #ffeeba;
+        }
+        
+        .commission-title { color: #d4a017; font-weight: 600; font-size: 15px; margin-bottom: 8px; }
+        .commission-desc { color: #d4a017; font-size: 13px; line-height: 1.5; }
+        
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            background: #fff;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0 20px;
+            border-top: 1px solid #eee;
+            z-index: 1000;
+        }
+        
+        .tab-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #999;
+            cursor: pointer;
+            font-size: 10px;
+            transition: color 0.2s;
+        }
+        
+        .tab-item.active { color: #07c160; }
+        .tab-icon { font-size: 22px; margin-bottom: 4px; }
+        
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-overlay.active { display: flex; }
+        
+        .modal {
+            background: #fff;
+            width: 340px;
+            border-radius: 16px;
+            padding: 24px;
+            animation: modalIn 0.3s ease;
+        }
+        
+        @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        .modal-title { font-size: 18px; font-weight: 600; text-align: center; margin-bottom: 20px; }
+        .modal-desc { font-size: 14px; color: #666; text-align: center; margin-bottom: 24px; line-height: 1.6; }
+        
+        .modal-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 22px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .btn-primary { background: #07c160; color: #fff; }
+        .btn-secondary { background: #f5f5f5; color: #333; margin-top: 12px; }
+        
+        .price-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 16px;
+        }
+        
+        .price-table th, .price-table td {
+            border: 1px solid #eee;
+            padding: 8px;
+            text-align: center;
+        }
+        
+        .price-table th { background: #fafafa; color: #666; }
+        .price-table tr:nth-child(even) { background: #fafafa; }
+        
+        .user-card {
+            background: linear-gradient(135deg, #07c160 0%, #10b981 100%);
+            padding: 32px 24px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+        
+        .user-info h3 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+        .user-info p { font-size: 12px; opacity: 0.8; }
+        
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 20px 16px;
+            background: #fff;
+            margin-bottom: 1px;
+            cursor: pointer;
+        }
+        
+        .menu-icon { font-size: 20px; margin-right: 16px; }
+        .menu-text { flex: 1; font-size: 15px; color: #333; }
+        .menu-arrow { color: #ccc; font-size: 16px; }
+        
+        .screenshot-alert {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 3000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+        
+        .screenshot-alert.active { display: flex; }
+        .alert-icon { font-size: 60px; margin-bottom: 20px; }
+        .alert-text { font-size: 24px; font-weight: 600; }
+        
+        .pay-success {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        .success-icon { font-size: 80px; color: #07c160; margin-bottom: 20px; }
+        .success-title { font-size: 20px; font-weight: 600; color: #333; margin-bottom: 12px; }
+        .success-desc { font-size: 14px; color: #666; margin-bottom: 32px; }
+        
+        .share-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 20px 16px;
+            padding: 24px;
+            border-radius: 16px;
+            color: #fff;
+            text-align: center;
+        }
+        
+        .share-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+        .share-desc { font-size: 13px; opacity: 0.9; margin-bottom: 16px; }
+        .share-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.4);
+            color: #fff;
+            padding: 10px 32px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .config-section {
+            background: #fff;
+            margin: 16px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .config-item:last-child { border-bottom: none; }
+        .config-label { font-size: 15px; color: #333; }
+        .config-value { font-size: 15px; color: #07c160; font-weight: 500; }
+        
+        .calc-section {
+            background: #fff;
+            margin: 16px;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .calc-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+        .calc-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        
+        .calc-label { color: #666; }
+        .calc-value { color: #333; font-weight: 500; }
+        .calc-result { color: #ff4d4f; font-size: 16px; font-weight: 600; }
+        
+        .demo-note {
+            background: #e6f7ff;
+            padding: 12px;
+            margin: 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #1890ff;
+            border-left: 4px solid #1890ff;
+        }
+        
+        .article-content {
+            padding: 20px 16px;
+            line-height: 1.8;
+            font-size: 15px;
+            color: #333;
+        }
+        
+        .article-content p { margin-bottom: 16px; }
+        
+        .section-title {
+            font-size: 14px;
+            color: #999;
+            padding: 12px 16px;
+        }
+        
+        .nav-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #ddd;
+            margin: 0 3px;
+            cursor: pointer;
+        }
+        
+        .nav-dot.active { background: #07c160; }
+        
+        .nav-dots {
+            display: flex;
+            justify-content: center;
+            padding: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="axure-container">
+        <div class="phone-header">付费文章小程序 - Axure原型</div>
+        <div class="screen">
+            <div id="page-list" class="page active">
+                <div class="nav-bar">
+                    <span class="nav-title">文章列表</span>
+                </div>
+                <div class="demo-note">💡 点击卡片进入文章详情</div>
+                
+                <div class="card" onclick="navigate('page-detail-preview')">
+                    <div class="article-cover">📖 微信支付推广文章</div>
+                    <div class="article-title">微信支付推广文章</div>
+                    <div class="article-preview">这是文章的预览内容，用户可以免费阅读这部分...</div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span class="price-tag"><span class="price-unit">¥</span><span class="price-value">6</span></span>
+                        <span style="color: #999; font-size: 12px;">已有 856 人购买</span>
+                    </div>
+                </div>
+                
+                <div class="card" onclick="showModal('coming-soon')">
+                    <div class="article-cover" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">📚 更多文章</div>
+                    <div class="article-title">更多付费文章即将上线</div>
+                    <div class="article-preview">敬请期待更多优质内容...</div>
+                </div>
+                
+                <div class="config-section">
+                    <div class="section-title">📊 当前定价规则</div>
+                    <div class="config-item">
+                        <span class="config-label">基础价格</span>
+                        <span class="config-value">¥6</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">前N名用户</span>
+                        <span class="config-value">1000人</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">每增人数</span>
+                        <span class="config-value">+10000人</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">涨价幅度</span>
+                        <span class="config-value">+¥1</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">价格上限</span>
+                        <span class="config-value">¥20</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="page-detail-preview" class="page">
+                <div class="nav-bar">
+                    <span class="nav-back" onclick="navigate('page-list')">‹</span>
+                    <span class="nav-title">文章详情</span>
+                </div>
+                
+                <div class="article-cover" style="border-radius: 0; height: 200px;">📖 微信支付推广文章</div>
+                
+                <div style="background: #fff; padding: 20px;">
+                    <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 16px;">微信支付推广文章</h2>
+                    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+                        <span class="price-tag"><span class="price-unit">¥</span><span class="price-value">6</span></span>
+                        <span style="color: #999; font-size: 14px;">已有 856 人购买</span>
+                    </div>
+                    <hr style="border: none; border-top: 1px solid #f0f0f0; margin-bottom: 16px;">
+                </div>
+                
+                <div class="article-content card" style="border-radius: 0; margin: 0;">
+                    <p>这是文章的预览内容，用户可以免费阅读这部分。</p>
+                    <p>文章介绍了微信支付的各种功能和优势，包括扫码支付、商户收款、资金管理等。</p>
+                    <p>想要阅读全文，请支付后查看。</p>
+                    
+                    <div class="preview-mask">
+                        <div class="mask-text">▼ 预览结束 ▼</div>
+                        <div class="mask-desc">支付后阅读全文</div>
+                    </div>
+                </div>
+                
+                <div class="commission-info">
+                    <div class="commission-title">💰 分享返佣</div>
+                    <div class="commission-desc">分享给好友，好友购买可获得最高30%返佣（不少于2元）</div>
+                </div>
+                
+                <button class="buy-btn" onclick="navigate('page-pay')">立即支付 ¥6</button>
+            </div>
+
+            <div id="page-detail-paid" class="page">
+                <div class="nav-bar">
+                    <span class="nav-back" onclick="navigate('page-list')">‹</span>
+                    <span class="nav-title">文章详情</span>
+                </div>
+                
+                <div class="article-cover" style="border-radius: 0; height: 200px;">📖 微信支付推广文章</div>
+                
+                <div style="background: #fff; padding: 20px;">
+                    <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 16px;">微信支付推广文章</h2>
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <span style="color: #07c160; font-size: 16px; font-weight: 500; padding: 6px 16px; background: rgba(7,193,96,0.1); border-radius: 16px;">✓ 已购买</span>
+                    </div>
+                    <hr style="border: none; border-top: 1px solid #f0f0f0; margin: 16px 0;">
+                </div>
+                
+                <div class="article-content card" style="border-radius: 0; margin: 0;">
+                    <p>这是文章的预览内容，用户可以免费阅读这部分。</p>
+                    <p>文章介绍了微信支付的各种功能和优势，包括扫码支付、商户收款、资金管理等。</p>
+                    
+                    <h3 style="font-size: 17px; font-weight: 600; margin: 20px 0 12px;">---全文开始---</h3>
+                    
+                    <p>微信支付是腾讯公司推出的一种移动支付方式，支持多种支付场景。</p>
+                    <p><strong>1. 扫码支付：</strong>用户可以通过扫描商户二维码完成支付。</p>
+                    <p><strong>2. 商户收款：</strong>商户可以通过微信支付收款码接收顾客付款。</p>
+                    <p><strong>3. 资金管理：</strong>商户可以在微信商户平台管理资金流水。</p>
+                    <p><strong>4. 营销活动：</strong>支持各种营销活动，如满减、红包等。</p>
+                    
+                    <p style="margin-top: 20px;"><strong>微信支付的优势：</strong></p>
+                    <ul style="padding-left: 20px; margin-bottom: 16px;">
+                        <li>便捷快速：无需携带现金，扫码即可支付</li>
+                        <li>安全可靠：多重安全保障，保护用户资金安全</li>
+                        <li>覆盖面广：支持线上线下多种场景</li>
+                        <li>数据分析：提供详细的交易数据和分析报告</li>
+                    </ul>
+                    
+                    <h3 style="font-size: 17px; font-weight: 600; margin: 20px 0 12px;">---全文结束---</h3>
+                </div>
+                
+                <div class="share-card">
+                    <div class="share-title">🎉 恭喜！您已解锁全文</div>
+                    <div class="share-desc">分享给好友，好友购买可获得最高30%返佣（不少于2元）</div>
+                    <button class="share-btn" onclick="showModal('share-success')">立即分享赚佣金</button>
+                </div>
+                
+                <div class="demo-note">⚠️ 演示：按 Ctrl+Shift+A 或截图快捷键模拟截图行为</div>
+            </div>
+
+            <div id="page-pay" class="page">
+                <div class="nav-bar">
+                    <span class="nav-back" onclick="navigate('page-detail-preview')">‹</span>
+                    <span class="nav-title">确认支付</span>
+                </div>
+                
+                <div class="card" style="margin-top: 30px;">
+                    <div style="display: flex; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #f0f0f0;">
+                        <span style="color: #666;">商品名称</span>
+                        <span style="color: #333;">微信支付推广文章</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #f0f0f0;">
+                        <span style="color: #666;">支付金额</span>
+                        <span class="price-tag"><span class="price-unit">¥</span><span class="price-value">6</span></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 16px 0;">
+                        <span style="color: #666;">支付方式</span>
+                        <span style="color: #333;">微信支付</span>
+                    </div>
+                </div>
+                
+                <div class="commission-info">
+                    <div class="commission-title">💰 分享返佣</div>
+                    <div class="commission-desc">支付后分享给好友，好友购买可获得最高30%返佣（不少于2元）</div>
+                </div>
+                
+                <div style="position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 400px; background: #fff; padding: 16px 24px; display: flex; align-items: center; gap: 24px; border-top: 1px solid #eee;">
+                    <div>
+                        <span style="font-size: 14px; color: #666;">合计</span>
+                        <span class="price-tag" style="margin-left: 8px;"><span class="price-unit">¥</span><span class="price-value">6</span></span>
+                    </div>
+                    <button class="buy-btn" style="width: auto;" onclick="navigate('page-pay-success')">确认支付</button>
+                </div>
+            </div>
+
+            <div id="page-pay-success" class="page">
+                <div class="nav-bar">
+                    <span class="nav-back" onclick="navigate('page-detail-paid')">‹</span>
+                    <span class="nav-title">支付成功</span>
+                </div>
+                
+                <div class="pay-success">
+                    <div class="success-icon">✓</div>
+                    <div class="success-title">支付成功</div>
+                    <div class="success-desc">您已成功解锁文章全文</div>
+                    
+                    <div class="calc-section" style="margin: 0 0 32px;">
+                        <div class="calc-title">📈 返佣计算演示</div>
+                        <div class="calc-row">
+                            <span class="calc-label">订单实付金额</span>
+                            <span class="calc-value">¥6.00</span>
+                        </div>
+                        <div class="calc-row">
+                            <span class="calc-label">返佣比例</span>
+                            <span class="calc-value">30%</span>
+                        </div>
+                        <div class="calc-row">
+                            <span class="calc-label">计算金额</span>
+                            <span class="calc-value">¥1.80</span>
+                        </div>
+                        <div class="calc-row">
+                            <span class="calc-label">最低返佣</span>
+                            <span class="calc-value">¥2.00</span>
+                        </div>
+                        <div style="border-top: 1px dashed #ddd; padding-top: 12px; margin-top: 12px;" class="calc-row">
+                            <span class="calc-label">实际返佣</span>
+                            <span class="calc-result">¥2.00</span>
+                        </div>
+                    </div>
+                    
+                    <button class="buy-btn" onclick="navigate('page-detail-paid')">查看全文</button>
+                    <button class="buy-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin-top: 12px;" onclick="showModal('share-success')">分享赚佣金</button>
+                </div>
+            </div>
+
+            <div id="page-my" class="page">
+                <div class="user-card">
+                    <div class="avatar">👤</div>
+                    <div class="user-info">
+                        <h3>用户昵称</h3>
+                        <p>用户ID：10001</p>
+                    </div>
+                </div>
+                
+                <div class="menu-item" onclick="showModal('orders')">
+                    <span class="menu-icon">📋</span>
+                    <span class="menu-text">我的订单</span>
+                    <span class="menu-arrow">›</span>
+                </div>
+                
+                <div class="menu-item" onclick="showModal('commission')">
+                    <span class="menu-icon">💰</span>
+                    <span class="menu-text">我的佣金</span>
+                    <span class="menu-arrow">›</span>
+                </div>
+                
+                <div class="menu-item" onclick="navigate('page-detail-paid')">
+                    <span class="menu-icon">📤</span>
+                    <span class="menu-text">分享赚钱</span>
+                    <span class="menu-arrow">›</span>
+                </div>
+                
+                <div class="menu-item" onclick="showModal('settings')">
+                    <span class="menu-icon">⚙️</span>
+                    <span class="menu-text">设置</span>
+                    <span class="menu-arrow">›</span>
+                </div>
+                
+                <div class="config-section" style="margin-top: 20px;">
+                    <div class="section-title">📊 定价规则配置</div>
+                    <div class="config-item">
+                        <span class="config-label">基础价格</span>
+                        <span class="config-value">¥6</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">起始人数阈值</span>
+                        <span class="config-value">1000人</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">每档人数</span>
+                        <span class="config-value">10000人</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">每档涨幅</span>
+                        <span class="config-value">¥1</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">价格上限</span>
+                        <span class="config-value">¥20</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">返佣比例</span>
+                        <span class="config-value">30%</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="config-label">最低返佣</span>
+                        <span class="config-value">¥2</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-bar">
+                <div class="tab-item active" onclick="navigate('page-list')">
+                    <span class="tab-icon">📖</span>
+                    <span>文章</span>
+                </div>
+                <div class="tab-item" onclick="navigate('page-my')">
+                    <span class="tab-icon">👤</span>
+                    <span>我的</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal" class="modal-overlay" onclick="closeModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div id="modal-title" class="modal-title">标题</div>
+            <div id="modal-content" class="modal-desc">内容</div>
+            <button id="modal-btn" class="modal-btn btn-primary" onclick="closeModal()">确定</button>
+            <button id="modal-btn-secondary" class="modal-btn btn-secondary" onclick="closeModal()" style="display: none;">取消</button>
+        </div>
+    </div>
+
+    <div id="screenshot-alert" class="screenshot-alert">
+        <div class="alert-icon">⚠️</div>
+        <div class="alert-text">禁止截图</div>
+    </div>
+
+    <script>
+        function navigate(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            
+            document.getElementById(pageId).classList.add('active');
+            
+            if (pageId === 'page-list') {
+                document.querySelector('.tab-item:first-child').classList.add('active');
+            } else if (pageId === 'page-my') {
+                document.querySelector('.tab-item:last-child').classList.add('active');
+            }
+            
+            window.scrollTo(0, 0);
+        }
+
+        function showModal(type) {
+            const modal = document.getElementById('modal');
+            const title = document.getElementById('modal-title');
+            const content = document.getElementById('modal-content');
+            const btn = document.getElementById('modal-btn');
+            const btnSec = document.getElementById('modal-btn-secondary');
+            
+            btnSec.style.display = 'none';
+            
+            switch(type) {
+                case 'coming-soon':
+                    title.textContent = '功能开发中';
+                    content.textContent = '更多付费文章正在筹备中，敬请期待！';
+                    btn.textContent = '确定';
+                    break;
+                case 'share-success':
+                    title.textContent = '分享成功';
+                    content.innerHTML = '分享链接已生成！<br><br>您的专属邀请码：<strong style="color:#07c160;">INV10001</strong><br><br>好友通过您的链接购买后，您将获得30%返佣（不少于2元）';
+                    btn.textContent = '知道了';
+                    break;
+                case 'orders':
+                    title.textContent = '我的订单';
+                    content.innerHTML = '<table class="price-table"><tr><th>订单号</th><th>金额</th><th>状态</th></tr><tr><td>ORD20260724...</td><td>¥6.00</td><td style="color:#07c160;">已支付</td></tr></table>';
+                    btn.textContent = '关闭';
+                    break;
+                case 'commission':
+                    title.textContent = '我的佣金';
+                    content.innerHTML = '<div style="text-align:left;"><div style="display:flex;justify-content:space-between;margin:8px 0;"><span>累计收益</span><span style="color:#ff4d4f;font-weight:600;">¥26.80</span></div><div style="display:flex;justify-content:space-between;margin:8px 0;"><span>已提现</span><span>¥10.00</span></div><div style="display:flex;justify-content:space-between;margin:8px 0;"><span>可用余额</span><span style="color:#07c160;font-weight:600;">¥16.80</span></div></div>';
+                    btn.textContent = '申请提现';
+                    btnSec.style.display = 'block';
+                    btnSec.textContent = '关闭';
+                    break;
+                case 'settings':
+                    title.textContent = '设置';
+                    content.textContent = '设置功能开发中';
+                    btn.textContent = '确定';
+                    break;
+            }
+            
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 's') || 
+                e.key === 'PrintScreen') {
+                e.preventDefault();
+                const alert = document.getElementById('screenshot-alert');
+                alert.classList.add('active');
+                setTimeout(() => alert.classList.remove('active'), 2000);
+            }
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (e.button === 2 || (e.ctrlKey && e.button === 0)) {
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>

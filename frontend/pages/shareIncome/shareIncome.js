@@ -55,7 +55,7 @@ Page({
 
   copyLink() {
     const { myUid } = this.data
-    const link = `pages/articlePreview/articlePreview?shareUid=${myUid}`
+    const link = app.globalData.shareLink || `pages/articlePreview/articlePreview?shareUid=${myUid}`
     wx.setClipboardData({
       data: link,
       success: () => {
@@ -68,7 +68,7 @@ Page({
     const myUid = app.globalData.userId
     return {
       title: "学渣逆袭：高考倒状元到百万年薪，快来看看吧！",
-      path: `/pages/articlePreview/articlePreview?shareUid=${myUid}`,
+      path: app.globalData.shareLink || `/pages/articlePreview/articlePreview?shareUid=${myUid}`,
       imageUrl: ""
     }
   },

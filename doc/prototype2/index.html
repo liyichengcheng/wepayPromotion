@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>付费文章阅读</title>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+  <!-- 文章容器 -->
+  <div class="article-wrap" id="articleWrap">
+    <div class="article-title">倒状元：沙迪克学徒到百万年薪Java架构师</div>
+    <div class="article-content" id="articleContent">
+      <p>2006年高考全省倒数第一，家境贫寒，进厂做沙迪克慢走丝线切割学徒，车间油污、高强度劳作、旁人的冷眼屈辱，无数个夜晚站在江边想要一跃而下……</p>
+      <p>靠着死磕韧劲自学CAD、Java，从外包底层开发一步步深耕JVM、Disruptor、JRaft分布式架构，33岁拿到大厂百万年薪offer。这条路布满血泪，完整的成长经历、踩坑记录、技术学习路线全部记录在正文全文中。</p>
+      <!-- 付费遮挡层 -->
+      <div class="pay-mask" id="payMask">
+        <div class="mask-inner">
+          <p class="tip-text">仅预览开篇内容，付费解锁全文</p>
+          <p class="price-text">当前售价：<span id="currentPrice">6</span> 元</p>
+          <div class="rule-box">
+            <p>📌定价规则：前1000人 6元；每新增1万名付费用户涨价1元，封顶20元</p>
+            <p>📌分享返佣：好友通过你的链接支付，自动获得30%佣金，保底2元</p>
+          </div>
+          <button class="pay-btn" id="payBtn">立即微信支付解锁全文</button>
+          <button class="share-btn" id="shareBtn">分享文章拿返佣</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 支付成功弹窗 -->
+  <div class="modal pay-success-modal" id="successModal">
+    <div class="modal-box">
+      <h3>支付成功，已解锁全文</h3>
+      <p>分享本篇文章给好友，好友付费你即可拿返佣收益</p>
+      <button class="close-modal">确定</button>
+    </div>
+  </div>
+
+  <script src="./js/main.js"></script>
+</body>
+</html>
