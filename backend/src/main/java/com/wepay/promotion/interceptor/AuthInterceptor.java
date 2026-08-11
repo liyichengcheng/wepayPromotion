@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 public class AuthInterceptor implements HandlerInterceptor {
 
     public static final long TOKEN_TTL_SECONDS = 30 * 24 * 3600L;
-    public static final String CURRENT_USER_ID = "currentUserId";
+    public static final String CURRENT_OPENID = "currentOpenid";
 
     private final StringRedisTemplate redis;
 
@@ -28,13 +28,13 @@ public class AuthInterceptor implements HandlerInterceptor {
             throw new BusinessException(401, "未登录");
         }
         String key = "token:" + token;
-        String userId = redis.opsForValue().get(key);
-        if (userId == null) {
+        String openid = redis.opsForValue().get(key);
+        if (openid == null) {
             throw new BusinessException(401, "登录已过期，请重新登录");
         }
         // 续期
         redis.expire(key, TOKEN_TTL_SECONDS, TimeUnit.SECONDS);
-        request.setAttribute(CURRENT_USER_ID, userId);
+        request.setAttribute(CURRENT_OPENID, openid);
         return true;
     }
 }

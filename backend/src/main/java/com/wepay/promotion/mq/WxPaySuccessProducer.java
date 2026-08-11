@@ -32,7 +32,7 @@ public class WxPaySuccessProducer {
                 .build();
         try {
             rocketMQTemplate.syncSend(destination, message);
-            log.info("发送支付成功消息: orderNo={}, userId={}", msg.getOrderNo(), msg.getUserId());
+            log.info("发送支付成功消息: orderNo={}, openid={}", msg.getOrderNo(), msg.getOpenid());
         } catch (Exception e) {
             log.error("发送支付成功消息失败: orderNo={}", msg.getOrderNo(), e);
             throw new RuntimeException("发送MQ消息失败", e);

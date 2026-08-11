@@ -22,10 +22,9 @@ public class IncomeController {
      * 获取用户佣金收益汇总(需登录)
      */
     @GetMapping("/getUserIncome")
-    public Result<IncomeSummaryVO> getUserIncome(@RequestParam String userId, HttpServletRequest request) {
-        // 以登录态为准
-        String currentUserId = (String) request.getAttribute(AuthInterceptor.CURRENT_USER_ID);
-        return Result.success(incomeService.getUserIncome(currentUserId));
+    public Result<IncomeSummaryVO> getUserIncome(HttpServletRequest request) {
+        String openid = (String) request.getAttribute(AuthInterceptor.CURRENT_OPENID);
+        return Result.success(incomeService.getUserIncome(openid));
     }
 
     /**
@@ -35,8 +34,8 @@ public class IncomeController {
     @PostMapping("/applyWithdraw")
     public Result<Void> applyWithdraw(@RequestBody(required = false) java.util.Map<String, String> body,
                                       HttpServletRequest request) {
-        String userId = (String) request.getAttribute(AuthInterceptor.CURRENT_USER_ID);
-        incomeService.applyWithdraw(userId);
+        String openid = (String) request.getAttribute(AuthInterceptor.CURRENT_OPENID);
+        incomeService.applyWithdraw(openid);
         return Result.success();
     }
 }

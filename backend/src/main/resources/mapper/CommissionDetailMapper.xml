@@ -4,50 +4,50 @@
 
     <!--
       分片规则: t_commission_detail -> ds${0..3}.t_commission_detail_${0..3}
-      分片键: user_id (获利者 userId), 算法: HASH_MOD(4)
+      分片键: openid (获利者openid), 算法: HASH_MOD(4)
     -->
 
-    <!-- 插入: 必须带 user_id (分片键), 精准路由到对应分片 -->
+    <!-- 插入: 必须带 openid (分片键), 精准路由到对应分片 -->
     <insert id="insert" parameterType="com.wepay.promotion.entity.CommissionDetail" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO t_commission_detail (user_id, openid, from_user_id, order_no, pay_amount,
+        INSERT INTO t_commission_detail (openid, from_openid, order_no, pay_amount,
                                          commission_amount, transfer_time)
-        VALUES (#{userId}, #{openid}, #{fromUserId}, #{orderNo}, #{payAmount},
+        VALUES (#{openid}, #{fromOpenid}, #{orderNo}, #{payAmount},
                 #{commissionAmount}, #{transferTime})
     </insert>
 
     <!--
-      按订单号查询佣金明细: 必须携带分片键 user_id (获利者), 精准路由到单分片
-      调用方需从 PayOrder.parentShareUid 取获利者 userId 传入
+      按订单号查询佣金明细: 必须携带分片键 openid (获利者), 精准路由到单分片
+      调用方需从 PayOrder.parentShareUid 取获利者 openid 传入
     -->
     <select id="selectByOrderNo" resultType="com.wepay.promotion.entity.CommissionDetail">
-        SELECT id, user_id, openid, from_user_id, order_no, pay_amount,
+        SELECT id, openid, from_openid, order_no, pay_amount,
                commission_amount, create_time, transfer_time
         FROM t_commission_detail
-        WHERE user_id = #{userId} AND order_no = #{orderNo}
+        WHERE openid = #{openid} AND order_no = #{orderNo}
     </select>
 
-    <!-- 按分片键 user_id 待提现佣金汇总 -> 精准路由 -->
+    <!-- 按分片键 openid 待提现佣金汇总 -> 精准路由 -->
     <select id="sumPendingCommissionByUser" resultType="java.lang.Long">
         SELECT COALESCE(SUM(commission_amount), 0) FROM t_commission_detail
-        WHERE user_id = #{userId} AND transfer_time IS NULL
+        WHERE openid = #{openid} AND transfer_time IS NULL
     </select>
 
-    <!-- 按分片键 user_id 已提现佣金汇总 -> 精准路由 -->
+    <!-- 按分片键 openid 已提现佣金汇总 -> 精准路由 -->
     <select id="sumTransferredByUser" resultType="java.lang.Long">
         SELECT COALESCE(SUM(commission_amount), 0) FROM t_commission_detail
-        WHERE user_id = #{userId} AND transfer_time IS NOT NULL
+        WHERE openid = #{openid} AND transfer_time IS NOT NULL
     </select>
 
-    <!-- 按分片键 user_id 今日推广人数 -> 精准路由 -->
+    <!-- 按分片键 openid 今日推广人数 -> 精准路由 -->
     <select id="countTodayByUser" resultType="int">
         SELECT COUNT(*) FROM t_commission_detail
-        WHERE user_id = #{userId} AND DATE(create_time) = CURDATE()
+        WHERE openid = #{openid} AND DATE(create_time) = CURDATE()
     </select>
 
-    <!-- 按分片键 user_id 批量更新为已提现 -> 精准路由 -->
+    <!-- 按分片键 openid 批量更新为已提现 -> 精准路由 -->
     <update id="batchUpdateToTransferred">
         UPDATE t_commission_detail
         SET transfer_time = #{transferTime}
-        WHERE user_id = #{userId} AND transfer_time IS NULL
+        WHERE openid = #{openid} AND transfer_time IS NULL
     </update>
 </mapper>

@@ -51,8 +51,8 @@ public class IncomeService {
         this.articleService = articleService;
     }
 
-    public IncomeSummaryVO getUserIncome(String userId) {
-        CommissionSummary summary = commissionSummaryMapper.selectByUserId(userId);
+    public IncomeSummaryVO getUserIncome(String openid) {
+        CommissionSummary summary = commissionSummaryMapper.selectByOpenid(openid);
         long totalFen;
         long withdrawableFen;
 
@@ -61,18 +61,18 @@ public class IncomeService {
             withdrawableFen = Math.max(0,
                     summary.getTotalAmount() - summary.getWithdrawnAmount() - summary.getPendingAmount());
         } else {
-            log.warn("佣金汇总不存在, 回落到明细表计算: userId={}", userId);
-            long pendingCommissionFen = commissionDetailMapper.sumPendingCommissionByUser(userId);
-            long withdrawnFen = commissionDetailMapper.sumTransferredByUser(userId);
+            log.warn("佣金汇总不存在, 回落到明细表计算: openid={}", openid);
+            long pendingCommissionFen = commissionDetailMapper.sumPendingCommissionByUser(openid);
+            long withdrawnFen = commissionDetailMapper.sumTransferredByUser(openid);
             totalFen = pendingCommissionFen + withdrawnFen;
-            User user = userMapper.selectByUserId(userId);
+            User user = userMapper.selectByOpenid(openid);
             if (user != null) {
-                initSummary(userId, user.getOpenid(), totalFen, withdrawnFen);
+                initSummary(openid, totalFen, withdrawnFen);
             }
             withdrawableFen = pendingCommissionFen;
         }
 
-        int todayCount = commissionDetailMapper.countTodayByUser(userId);
+        int todayCount = commissionDetailMapper.countTodayByUser(openid);
 
         Map<String, Object> payTotalData = articleService.getPayTotal(ARTICLE_ID);
         int totalPayUser = ((Number) payTotalData.get("totalPayUser")).intValue();
@@ -91,24 +91,24 @@ public class IncomeService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void applyWithdraw(String userId) {
-        User user = userMapper.selectByUserId(userId);
+    public void applyWithdraw(String openid) {
+        User user = userMapper.selectByOpenid(openid);
         if (user == null || user.getOpenid() == null) {
             throw new BusinessException("用户不存在或未绑定openid");
         }
 
         // 1. 获取可提现余额
-        CommissionSummary summary = commissionSummaryMapper.selectByUserId(userId);
+        CommissionSummary summary = commissionSummaryMapper.selectByOpenid(openid);
         long availableFen;
         if (summary != null) {
             availableFen = Math.max(0,
                     summary.getTotalAmount() - summary.getWithdrawnAmount() - summary.getPendingAmount());
         } else {
-            long pendingCommissionFen = commissionDetailMapper.sumPendingCommissionByUser(userId);
-            long pendingWithdrawFen = withdrawMapper.sumPendingByUser(userId);
+            long pendingCommissionFen = commissionDetailMapper.sumPendingCommissionByUser(openid);
+            long pendingWithdrawFen = withdrawMapper.sumPendingByUser(openid);
             availableFen = Math.max(0, pendingCommissionFen - pendingWithdrawFen);
-            initSummary(userId, user.getOpenid(), 0, 0);
-            summary = commissionSummaryMapper.selectByUserId(userId);
+            initSummary(openid, 0, 0);
+            summary = commissionSummaryMapper.selectByOpenid(openid);
         }
 
         if (availableFen < MIN_WITHDRAW_FEN) {
@@ -117,47 +117,45 @@ public class IncomeService {
 
         // 2. 创建提现申请
         Withdraw withdraw = new Withdraw();
-        withdraw.setUserId(userId);
-        withdraw.setOpenid(user.getOpenid());
+        withdraw.setOpenid(openid);
         withdraw.setAmount((int) availableFen);
         withdraw.setStatus(0);
         withdrawMapper.insert(withdraw);
 
         // 3. 更新汇总表：增加提现中金额
-        commissionSummaryMapper.incrementPendingAmount(userId, (int) availableFen);
+        commissionSummaryMapper.incrementPendingAmount(openid, (int) availableFen);
 
         // 4. 调用微信企业付款接口
         String transferNo = "wd_" + withdraw.getId() + "_" + UUID.randomUUID().toString().substring(0, 8);
         try {
             Map<String, String> resp = wxPayService.transfer(
-                    transferNo, user.getOpenid(), (int) availableFen,
+                    transferNo, openid, (int) availableFen,
                     "分享佣金提现", getServerIp());
 
             if ("SUCCESS".equals(resp.get("return_code")) && "SUCCESS".equals(resp.get("result_code"))) {
-                withdrawMapper.updateStatus(userId, withdraw.getId(), 2);
-                commissionSummaryMapper.markWithdrawSuccess(userId, (int) availableFen);
-                commissionDetailMapper.batchUpdateToTransferred(userId,"",new Date());
-                log.info("提现成功: user={}, 金额={}分, paymentNo={}", userId, availableFen, resp.get("payment_no"));
+                withdrawMapper.updateStatus(openid, withdraw.getId(), 2);
+                commissionSummaryMapper.markWithdrawSuccess(openid, (int) availableFen);
+                commissionDetailMapper.batchUpdateToTransferred(openid, "", new Date());
+                log.info("提现成功: openid={}, 金额={}分, paymentNo={}", openid, availableFen, resp.get("payment_no"));
             } else {
                 String failReason = resp.get("err_code") + ":" + resp.get("err_code_des");
-                withdrawMapper.updateStatus(userId, withdraw.getId(), 3);
-                commissionSummaryMapper.markWithdrawFailed(userId, (int) availableFen);
+                withdrawMapper.updateStatus(openid, withdraw.getId(), 3);
+                commissionSummaryMapper.markWithdrawFailed(openid, (int) availableFen);
                 throw new BusinessException("提现失败: " + failReason);
             }
         } catch (BusinessException e) {
-            commissionSummaryMapper.markWithdrawFailed(userId, (int) availableFen);
+            commissionSummaryMapper.markWithdrawFailed(openid, (int) availableFen);
             throw e;
         } catch (Exception e) {
-            withdrawMapper.updateStatus(userId, withdraw.getId(), 3);
-            commissionSummaryMapper.markWithdrawFailed(userId, (int) availableFen);
-            log.error("提现异常: userId={}", userId, e);
+            withdrawMapper.updateStatus(openid, withdraw.getId(), 3);
+            commissionSummaryMapper.markWithdrawFailed(openid, (int) availableFen);
+            log.error("提现异常: openid={}", openid, e);
             throw new BusinessException("提现处理异常, 请稍后重试");
         }
     }
 
-    private void initSummary(String userId, String openid, long totalAmount, long withdrawnAmount) {
+    private void initSummary(String openid, long totalAmount, long withdrawnAmount) {
         CommissionSummary summary = new CommissionSummary();
-        summary.setUserId(userId);
         summary.setOpenid(openid);
         summary.setTotalAmount((int) totalAmount);
         summary.setPendingAmount(0);

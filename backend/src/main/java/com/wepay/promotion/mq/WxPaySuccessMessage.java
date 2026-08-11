@@ -12,15 +12,13 @@ public class WxPaySuccessMessage implements Serializable {
 
     /** 订单号 */
     private String orderNo;
-    /** 支付用户ID */
-    private String userId;
     /** 支付者openid */
     private String openid;
     /** 文章ID */
     private Long articleId;
     /** 支付金额(分) */
     private Integer payAmount;
-    /** 分享者user_id */
+    /** 分享者openid */
     private String parentShareUid;
     /** 微信交易号 */
     private String transactionId;

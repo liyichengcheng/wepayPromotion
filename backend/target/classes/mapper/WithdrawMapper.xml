@@ -4,33 +4,33 @@
 
     <!--
       分片规则: t_withdraw -> ds${0..3}.t_withdraw_${0..3}
-      分片键: user_id, 算法: HASH_MOD(4)
+      分片键: openid, 算法: HASH_MOD(4)
     -->
 
-    <!-- 插入: 必须带 user_id (分片键), 精准路由到对应分片 -->
+    <!-- 插入: 必须带 openid (分片键), 精准路由到对应分片 -->
     <insert id="insert" parameterType="com.wepay.promotion.entity.Withdraw" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO t_withdraw (user_id, openid, amount, status)
-        VALUES (#{userId}, #{openid}, #{amount}, #{status})
+        INSERT INTO t_withdraw (openid, amount, status)
+        VALUES (#{openid}, #{amount}, #{status})
     </insert>
 
-    <!-- 按分片键 user_id 汇总已成功提现金额 -> 精准路由 -->
+    <!-- 按分片键 openid 汇总已成功提现金额 -> 精准路由 -->
     <select id="sumWithdrawnByUser" resultType="java.lang.Long">
         SELECT COALESCE(SUM(amount), 0) FROM t_withdraw
-        WHERE user_id = #{userId} AND status = 2
+        WHERE openid = #{openid} AND status = 2
     </select>
 
-    <!-- 按分片键 user_id 汇总处理中提现金额 -> 精准路由 -->
+    <!-- 按分片键 openid 汇总处理中提现金额 -> 精准路由 -->
     <select id="sumPendingByUser" resultType="java.lang.Long">
         SELECT COALESCE(SUM(amount), 0) FROM t_withdraw
-        WHERE user_id = #{userId} AND status IN (0, 1)
+        WHERE openid = #{openid} AND status IN (0, 1)
     </select>
 
     <!--
-      更新提现单状态: 必须携带分片键 user_id + id 实现精准路由
-      调用方需从已查询/插入的 Withdraw 实体中取 userId 传入
+      更新提现单状态: 必须携带分片键 openid + id 实现精准路由
+      调用方需从已查询/插入的 Withdraw 实体中取 openid 传入
     -->
     <update id="updateStatus">
         UPDATE t_withdraw SET status = #{status}, update_time = NOW()
-        WHERE user_id = #{userId} AND id = #{id}
+        WHERE openid = #{openid} AND id = #{id}
     </update>
 </mapper>

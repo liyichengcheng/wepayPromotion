@@ -30,8 +30,8 @@ public class PayController {
      */
     @PostMapping("/createOrder")
     public Result<PayInfoVO> createOrder(@RequestBody CreateOrderRequest req, HttpServletRequest request) {
-        String userId = (String) request.getAttribute(AuthInterceptor.CURRENT_USER_ID);
-        PayInfoVO payInfo = payService.createOrder(userId, req);
+        String openid = (String) request.getAttribute(AuthInterceptor.CURRENT_OPENID);
+        PayInfoVO payInfo = payService.createOrder(openid, req);
         return Result.success(payInfo);
     }
 
@@ -61,11 +61,11 @@ public class PayController {
      */
     @GetMapping("/checkStatus")
     public Result<Map<String, Object>> checkStatus(@RequestParam Long articleId, HttpServletRequest request) {
-        String userId = (String) request.getAttribute(AuthInterceptor.CURRENT_USER_ID);
+        String openid = (String) request.getAttribute(AuthInterceptor.CURRENT_OPENID);
         if (articleId == null) {
             throw new BusinessException("articleId不能为空");
         }
-        return Result.success(payService.checkPayStatus(userId, articleId));
+        return Result.success(payService.checkPayStatus(openid, articleId));
     }
 
     private String readBody(HttpServletRequest request) throws Exception {

@@ -21,6 +21,8 @@
         <java.version>1.8</java.version>
         <mybatis.spring.boot.version>2.3.2</mybatis.spring.boot.version>
         <shardingsphere.version>5.3.2</shardingsphere.version>
+        <!-- 覆盖 Spring Boot 2.7.x 自带的旧版 SnakeYAML, 解决 ShardingSphere 5.3.2 的 setCodePointLimit NoSuchMethodError -->
+        <snakeyaml.version>1.33</snakeyaml.version>
     </properties>
 
     <dependencies>
@@ -62,7 +64,12 @@
             <groupId>org.apache.shardingsphere</groupId>
             <artifactId>shardingsphere-jdbc-core</artifactId>
             <version>${shardingsphere.version}</version>
-            <classifier>shaded</classifier>
+        </dependency>
+        <!-- 显式声明 SnakeYAML 1.33, 解决 ShardingSphere 5.3.2 的 setCodePointLimit NoSuchMethodError -->
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>1.33</version>
         </dependency>
         <!-- RocketMQ 异步消息 -->
         <dependency>

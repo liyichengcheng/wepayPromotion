@@ -53,15 +53,16 @@ public class CommissionConsumer implements RocketMQListener<String> {
             return;
         }
 
-        // 幂等: 按分片键 (parentShareUid=获利者userId) + orderNo 精准路由检查
+        // parentShareUid 即为分享者openid(分片键)
+        // 幂等: 按分片键 (parentShareUid=获利者openid) + orderNo 精准路由检查
         CommissionDetail existing = commissionDetailMapper.selectByOrderNo(parentShareUid, orderNo);
         if (existing != null) {
             log.info("订单[{}]佣金已处理，跳过", orderNo);
             return;
         }
 
-        // 获取分享者信息
-        User referrer = userMapper.selectByUserId(parentShareUid);
+        // 获取分享者信息 (parentShareUid 是 openid, 直接精准路由)
+        User referrer = userMapper.selectByOpenid(parentShareUid);
         if (referrer == null || referrer.getOpenid() == null) {
             log.warn("分享者不存在: parentShareUid={}", parentShareUid);
             return;
@@ -74,11 +75,10 @@ public class CommissionConsumer implements RocketMQListener<String> {
             commissionFen = COMMISSION_MIN_FEN;
         }
 
-        // 1. 插入佣金明细 (无 article_id/status/transfer_no 等字段，与 schema.sql 对齐)
+        // 1. 插入佣金明细
         CommissionDetail detail = new CommissionDetail();
-        detail.setUserId(referrer.getUserId());
         detail.setOpenid(referrer.getOpenid());
-        detail.setFromUserId(msg.getUserId());
+        detail.setFromOpenid(msg.getOpenid());
         detail.setOrderNo(orderNo);
         detail.setPayAmount(totalFee);
         detail.setCommissionAmount(commissionFen);
@@ -87,19 +87,18 @@ public class CommissionConsumer implements RocketMQListener<String> {
 
         // 2. 初始化或更新佣金汇总
         ensureSummary(referrer);
-        commissionSummaryMapper.incrementTotalAmount(referrer.getUserId(), commissionFen);
+        commissionSummaryMapper.incrementTotalAmount(referrer.getOpenid(), commissionFen);
 
-        log.info("佣金处理完成: 分享者[{}]获得佣金{}分, 订单号={}", referrer.getUserId(), commissionFen, orderNo);
+        log.info("佣金处理完成: 分享者[{}]获得佣金{}分, 订单号={}", referrer.getOpenid(), commissionFen, orderNo);
     }
 
     /**
      * 确保用户有佣金汇总记录
      */
     private void ensureSummary(User referrer) {
-        CommissionSummary summary = commissionSummaryMapper.selectByUserId(referrer.getUserId());
+        CommissionSummary summary = commissionSummaryMapper.selectByOpenid(referrer.getOpenid());
         if (summary == null) {
             summary = new CommissionSummary();
-            summary.setUserId(referrer.getUserId());
             summary.setOpenid(referrer.getOpenid());
             summary.setTotalAmount(0);
             summary.setPendingAmount(0);

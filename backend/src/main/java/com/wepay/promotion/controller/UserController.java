@@ -21,7 +21,7 @@ public class UserController {
     }
 
     /**
-     * 小程序登录: code 换 openid, 创建/查询用户, 返回 userId/token/分享链接
+     * 小程序登录: code 换 openid, 创建/查询用户, 返回 openid/token/分享链接
      */
     @PostMapping("/wxLogin")
     public Result<WxLoginVO> wxLogin(@RequestBody WxLoginRequest req) {
@@ -34,9 +34,9 @@ public class UserController {
      */
     @GetMapping("/shareLink")
     public Result<Map<String, String>> shareLink(HttpServletRequest request) {
-        String userId = (String) request.getAttribute(AuthInterceptor.CURRENT_USER_ID);
+        String openid = (String) request.getAttribute(AuthInterceptor.CURRENT_OPENID);
         Map<String, String> data = new HashMap<>();
-        data.put("shareLink", userService.buildShareLink(userId));
+        data.put("shareLink", userService.buildShareLink(openid));
         return Result.success(data);
     }
 }

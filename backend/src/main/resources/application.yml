@@ -24,97 +24,8 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 
-# ShardingSphere 5.x 配置
-# 核心表按 user_id 哈希分库分表（4个分片，逻辑表名不变，物理表在4个子库中）
-# 文章表不分片，放在主库 wepay_promotion
-# 用户/订单/付费记录/佣金明细/佣金汇总/提现表按 user_id 分片到4个子库
-spring.shardingsphere:
-  datasource:
-    names: master,ds0
-    master:
-      type: com.zaxxer.hikari.HikariDataSource
-      driver-class-name: com.mysql.cj.jdbc.Driver
-      jdbc-url: jdbc:mysql://127.0.0.1:3306/wepay_promotion?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-      username: wepay
-      password: wepay
-    ds0:
-      type: com.zaxxer.hikari.HikariDataSource
-      driver-class-name: com.mysql.cj.jdbc.Driver
-      jdbc-url: jdbc:mysql://127.0.0.1:3306/wepay_promotion?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-      username: wepay
-      password: wepay
-  rules:
-    sharding:
-      tables:
-        # 用户表：按 user_id 分片到4个子库
-        t_user:
-          actual-data-nodes: ds$->{0}.t_user_$->{0..3}
-          database-strategy:
-            standard:
-              sharding-column: user_id
-              sharding-algorithm-name: user-id-db
-          table-strategy:
-            standard:
-              sharding-column: user_id
-              sharding-algorithm-name: user-id-table
-        t_pay_order:
-          actual-data-nodes: ds$->{0}.t_pay_order_$->{0..3}
-          database-strategy:
-            standard:
-              sharding-column: user_id
-              sharding-algorithm-name: user-id-db
-          table-strategy:
-            standard:
-              sharding-column: user_id
-              sharding-algorithm-name: user-id-table
-        t_commission_detail:
-          actual-data-nodes: ds$->{0}.t_commission_detail_$->{0..3}
-          database-strategy:
-            standard:
-              sharding-column: user_id
-              sharding-algorithm-name: user-id-db
-          table-strategy:
-            standard:
-              sharding-column: user_id
-              sharding-algorithm-name: user-id-table
-        t_commission_summary:
-          actual-data-nodes: ds$->{0}.t_commission_summary_$->{0..3}
-          database-strategy:
-            standard:
-              sharding-column: user_id
-              sharding-algorithm-name: user-id-db
-          table-strategy:
-            standard:
-              sharding-column: user_id
-              sharding-algorithm-name: user-id-table
-        t_withdraw:
-          actual-data-nodes: ds$->{0}.t_withdraw_$->{0..3}
-          database-strategy:
-            standard:
-              sharding-column: user_id
-              sharding-algorithm-name: user-id-db
-          table-strategy:
-            standard:
-              sharding-column: user_id
-              sharding-algorithm-name: user-id-table
-      sharding-algorithms:
-        user-id-db:
-          type: HASH_MOD
-          props:
-            sharding-count: "4"
-        user-id-table:
-          type: HASH_MOD
-          props:
-            sharding-count: "4"
-    broadcast-tables:
-      # 不分片的表放在主库
-      - t_article
-  # 打印 SQL
-  props:
-    sql:
-      show: true
-
-# 微信小程序 & 微信支付配置
+# ShardingSphere 配置已移至 shardingsphere.yaml
+# 由 ShardingSphereConfig.java 加载创建 DataSource Bean
 wx:
   miniapp:
     appid: wxefa531580e370957
@@ -135,4 +46,4 @@ rocketmq:
 logging:
   level:
     com.wepay.promotion: debug
-    org.apache.shardingsphere: info
+    org.apache.shardingsphere: debug

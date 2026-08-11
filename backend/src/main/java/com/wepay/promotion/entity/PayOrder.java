@@ -7,7 +7,7 @@ import java.util.Date;
 public class PayOrder {
     private Long id;
     private String orderNo;
-    private String userId;
+    /** 支付者openid(分片键) */
     private String openid;
     private Long articleId;
     private Integer payPrice;

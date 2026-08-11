@@ -6,7 +6,7 @@ import java.util.Date;
 @Data
 public class User {
     private Long id;
-    private String userId;
+    /** 微信openid(分片键) */
     private String openid;
     private String unionId;
     private Date createTime;

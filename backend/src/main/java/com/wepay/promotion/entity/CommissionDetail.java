@@ -9,12 +9,10 @@ import java.util.Date;
 @Data
 public class CommissionDetail {
     private Long id;
-    /** 获利者user_id(分片键) */
-    private String userId;
-    /** 获利者openid */
+    /** 获利者openid(分片键) */
     private String openid;
-    /** 支付者user_id */
-    private String fromUserId;
+    /** 支付者openid */
+    private String fromOpenid;
     /** 订单号 */
     private String orderNo;
     /** 订单支付金额(分) */
