@@ -36,19 +36,19 @@ public class PayService {
     private final StringRedisTemplate redis;
     private final WxConfig wxConfig;
     private final ArticleService articleService;
-    private final WxPaySuccessProducer mqProducer;
+    private final CommissionService commissionService;
 
     public PayService(PayOrderMapper payOrderMapper, UserMapper userMapper,
                       WxPayService wxPayService, StringRedisTemplate redis,
                       WxConfig wxConfig, ArticleService articleService,
-                      WxPaySuccessProducer mqProducer) {
+                      CommissionService commissionService) {
         this.payOrderMapper = payOrderMapper;
         this.userMapper = userMapper;
         this.wxPayService = wxPayService;
         this.redis = redis;
         this.wxConfig = wxConfig;
         this.articleService = articleService;
-        this.mqProducer = mqProducer;
+        this.commissionService = commissionService;
     }
 
     public PayInfoVO createOrder(String openid, CreateOrderRequest req) {
@@ -96,7 +96,7 @@ public class PayService {
 
     /**
      * 微信支付回调处理
-     * 注: 已付费状态仅通过 Redis 缓存(30天TTL)维护, 不再落 t_user_pay_record 表
+     * 注: 已付费状态仅通过 Redis 缓存(30天TTL)维护
      */
     @Transactional(rollbackFor = Exception.class)
     public String handleNotify(String xmlRaw) {
@@ -125,7 +125,7 @@ public class PayService {
         // 支付回调只有 order_no 没有分片键 openid:
         // ShardingSphere standard 策略的 SELECT 缺少分片键时自动广播到
         // 4 表 = 16 物理分片, 自动追加后缀: ds{N}.t_pay_order_{M}
-        PayOrder order = payOrderMapper.selectByOrderNo(orderNo);
+        PayOrder order = payOrderMapper.selectByOpenidOrderNo(openid,orderNo);
         if (order == null) {
             log.warn("回调订单不存在: {}", orderNo);
             return notifyFail("订单不存在");
@@ -141,26 +141,13 @@ public class PayService {
         // 3. 记录已支付状态至 Redis (30天TTL)
         recordPayStatusCache(order, openid);
         // 4. t_pay_order.status=1 后, 发送 RocketMQ 消息异步处理佣金
-        sendPaySuccessMessage(order, transactionId);
+        try {
+            commissionService.handleCommission(order);
+        } catch (Exception e) {
+            log.error("佣金处理失败，order:{}",order,e);
+        }
 
         return notifySuccess();
-    }
-
-    private void sendPaySuccessMessage(PayOrder order, String transactionId) {
-        WxPaySuccessMessage msg = new WxPaySuccessMessage();
-        msg.setOrderNo(order.getOrderNo());
-        msg.setOpenid(order.getOpenid());
-        msg.setArticleId(order.getArticleId());
-        msg.setPayAmount(order.getPayPrice());
-        msg.setParentShareUid(order.getParentShareUid());
-        msg.setTransactionId(transactionId);
-        msg.setPayTime(System.currentTimeMillis());
-
-        try {
-            mqProducer.send(msg);
-        } catch (Exception e) {
-            log.error("发送支付成功MQ消息失败, orderNo={}, 建议补偿扫描重试", order.getOrderNo(), e);
-        }
     }
 
     /**

@@ -23,9 +23,8 @@ public class WxPayUtil {
 
     /**
      * 微信支付 V2 MD5 签名
-     *
      * @param params 业务参数(会自动按字典序排序, 忽略空值与 sign 字段)
-     * @param key    商户密钥 mch_key
+     * @param key 商户密钥 mch_key
      */
     public static String sign(Map<String, String> params, String key) {
         SortedMap<String, String> sorted = new TreeMap<>(params);

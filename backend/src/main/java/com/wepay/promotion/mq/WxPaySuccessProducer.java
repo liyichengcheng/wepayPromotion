@@ -18,7 +18,7 @@ public class WxPaySuccessProducer {
     public static final String TOPIC = "WX_PAY_SUCCESS_TOPIC";
     public static final String TAG = "commission";
 
-    private final RocketMQTemplate rocketMQTemplate;
+//    private final RocketMQTemplate rocketMQTemplate;
 
     /**
      * 发送支付成功消息
@@ -30,7 +30,7 @@ public class WxPaySuccessProducer {
                 .setHeader("KEYS", msg.getOrderNo())
                 .build();
         try {
-            rocketMQTemplate.syncSend(destination, message);
+//            rocketMQTemplate.syncSend(destination, message);
             log.info("发送支付成功消息: orderNo={}, openid={}", msg.getOrderNo(), msg.getOpenid());
         } catch (Exception e) {
             log.error("发送支付成功消息失败: orderNo={}", msg.getOrderNo(), e);

@@ -18,4 +18,22 @@ public class PayOrder {
     private Date payTime;
     private Date createTime;
     private Date updateTime;
+
+    @Override
+    public String toString() {
+        return "PayOrder{" +
+                "id=" + id +
+                ", orderNo='" + orderNo + '\'' +
+                ", openid='" + openid + '\'' +
+                ", articleId=" + articleId +
+                ", payPrice=" + payPrice +
+                ", parentShareUid='" + parentShareUid + '\'' +
+                ", status=" + status +
+                ", prepayId='" + prepayId + '\'' +
+                ", transactionId='" + transactionId + '\'' +
+                ", payTime=" + payTime +
+                ", createTime=" + createTime +
+                ", updateTime=" + updateTime +
+                '}';
+    }
 }

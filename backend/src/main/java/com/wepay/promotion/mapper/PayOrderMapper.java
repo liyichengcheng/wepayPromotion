@@ -9,7 +9,7 @@ public interface PayOrderMapper {
     /**
      * 按订单号查询(广播查询，无分片键时ShardingSphere自动广播)
      */
-    PayOrder selectByOrderNo(@Param("orderNo") String orderNo);
+    PayOrder selectByOpenidOrderNo(@Param("openid") String openid,@Param("orderNo") String orderNo);
 
     /**
      * 更新支付成功状态

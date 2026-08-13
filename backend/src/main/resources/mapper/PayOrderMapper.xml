@@ -30,10 +30,10 @@
       应用场景: 支付回调时只拿到 out_trade_no, 没有 openid;
       查询结果中包含 openid, 后续的 updatePaySuccess 必须携带 openid 进行精准路由
     -->
-    <select id="selectByOrderNo" resultType="com.wepay.promotion.entity.PayOrder">
+    <select id="selectByOpenidOrderNo" resultType="com.wepay.promotion.entity.PayOrder">
         SELECT id, order_no, openid, article_id, pay_price, parent_share_uid,
                status, prepay_id, transaction_id, pay_time, create_time, update_time
-        FROM t_pay_order WHERE order_no = #{orderNo}
+        FROM t_pay_order WHERE openid = #{openid} and order_no = #{orderNo}
     </select>
 
     <!--
