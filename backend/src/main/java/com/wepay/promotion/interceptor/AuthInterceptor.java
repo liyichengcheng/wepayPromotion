@@ -11,8 +11,7 @@ import java.util.concurrent.TimeUnit;
 
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
-
-    public static final long TOKEN_TTL_SECONDS = 30 * 24 * 3600L;
+    public static final long TOKEN_TTL_SECONDS = 24 * 3600L;
     public static final String CURRENT_OPENID = "currentOpenid";
 
     private final StringRedisTemplate redis;

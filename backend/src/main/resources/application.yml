@@ -32,8 +32,8 @@ wx:
     secret: ba700ff366edfce3dc628ddb8ebdd978
   pay:
     mch-id: 1749127860
-    mch-key: PUB_KEY_ID_0117491278602026080700111554000604
-    notify-url: https://your-domain.com/api/pay/notify
+    mch-key: LPfhyebbjuOI158328OWCVghspoumqwv
+    notify-url: http://nj409uu6213.vicp.fun/api/pay/notify
     cert-path: D:/Users/clinton/Downloads/cert/apiclient_cert.p12
     transfer-desc: 文章分享佣金
 

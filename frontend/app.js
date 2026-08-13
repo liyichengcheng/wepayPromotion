@@ -5,7 +5,7 @@ App({
     shareUid: "",
     articleId: 10001,
     isPayUnlock: false,
-    currentPrice: 6,
+    currentPrice: 1,
     totalPayUser: 0,
     isLoginReady: false,
     loginCallbacks: [],
@@ -15,7 +15,7 @@ App({
   $request: request,
 
   calcPrice(payUserCount) {
-    const basePrice = 6
+    const basePrice = 1
     const maxPrice = 20
     if (payUserCount <= 1000) return basePrice
     const exceed = payUserCount - 1000
@@ -69,12 +69,12 @@ App({
         method: "POST",
         data: { code }
       })
-      wx.setStorageSync("userId", res.data.userId)
+      wx.setStorageSync("userId", res.data.openid)
       wx.setStorageSync("token", res.data.token)
-      this.globalData.userId = res.data.userId
+      this.globalData.userId = res.data.openid
       this.globalData.shareLink = res.data.shareLink || ""
       this.globalData.isLoginReady = true
-      this.globalData.loginCallbacks.forEach(cb => cb(res.data.userId))
+      this.globalData.loginCallbacks.forEach(cb => cb(res.data.openid))
       this.globalData.loginCallbacks = []
       this.checkPayStatus()
     } catch (err) {

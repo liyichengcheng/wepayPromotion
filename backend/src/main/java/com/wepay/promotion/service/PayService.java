@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 public class PayService {
-
     public static final int PAY_VALID_DAYS = 30;
     private static final String UNLOCK_KEY = "pay:unlock:%s:%s";
     private static final String ORDER_BODY = "文章阅读-学渣逆袭";
@@ -58,8 +57,7 @@ public class PayService {
             throw new BusinessException("用户不存在");
         }
         Long articleId = req.getArticleId() == null ? 10001L : req.getArticleId();
-        int payPriceYuan = req.getPayPrice() == null ? 6 : req.getPayPrice();
-        int totalFee = payPriceYuan * 100;
+        int payPrice = req.getPayPrice() == null ? 600 : req.getPayPrice();
 
         String orderNo = "po_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
 
@@ -67,7 +65,7 @@ public class PayService {
         order.setOrderNo(orderNo);
         order.setOpenid(openid);
         order.setArticleId(articleId);
-        order.setPayPrice(totalFee);
+        order.setPayPrice(payPrice);
         String parentShareUid = req.getParentShareUid();
         if (parentShareUid != null && parentShareUid.isEmpty()) {
             parentShareUid = null;
@@ -81,7 +79,7 @@ public class PayService {
 
         Map<String, String> resp;
         try {
-            resp = wxPayService.unifiedOrder(orderNo, totalFee, openid, ORDER_BODY, getServerIp());
+            resp = wxPayService.unifiedOrder(orderNo, payPrice, openid, ORDER_BODY, getServerIp());
         } catch (Exception e) {
             log.error("统一下单失败 orderNo={}", orderNo, e);
             throw new BusinessException("支付服务暂不可用");
@@ -126,7 +124,7 @@ public class PayService {
 
         // 支付回调只有 order_no 没有分片键 openid:
         // ShardingSphere standard 策略的 SELECT 缺少分片键时自动广播到
-        // 4 库 × 4 表 = 16 物理分片, 自动追加后缀: ds{N}.t_pay_order_{M}
+        // 4 表 = 16 物理分片, 自动追加后缀: ds{N}.t_pay_order_{M}
         PayOrder order = payOrderMapper.selectByOrderNo(orderNo);
         if (order == null) {
             log.warn("回调订单不存在: {}", orderNo);
@@ -138,13 +136,10 @@ public class PayService {
 
         // 1. 更新订单为已支付 (t_pay_order.status=1), 携带分片键 openid 实现精准路由
         payOrderMapper.updatePaySuccess(order.getOpenid(), orderNo, transactionId, new Date());
-
         // 2. 原子递增文章付费计数(Redis)
         articleService.incrementPayTotal(order.getArticleId());
-
-        // 3. 记录已支付状态至 Redis (30天TTL) - 不再写入 t_user_pay_record
+        // 3. 记录已支付状态至 Redis (30天TTL)
         recordPayStatusCache(order, openid);
-
         // 4. t_pay_order.status=1 后, 发送 RocketMQ 消息异步处理佣金
         sendPaySuccessMessage(order, transactionId);
 
@@ -177,13 +172,13 @@ public class PayService {
     }
 
     /**
-     * 检查用户对某文章的已支付状态是否有效(30天内)
+     * 检查用户对某文章的支付状态是否有效(30天内)
      */
     public Map<String, Object> checkPayStatus(String openid, Long articleId) {
         String key = String.format(UNLOCK_KEY, openid, articleId);
         Boolean paid = redis.hasKey(key);
         Map<String, Object> data = new HashMap<>();
-        data.put("paid", Boolean.TRUE.equals(paid));
+        data.put("paid", paid);
         return data;
     }
 

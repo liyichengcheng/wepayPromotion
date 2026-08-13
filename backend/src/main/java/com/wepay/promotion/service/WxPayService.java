@@ -20,11 +20,9 @@ import java.util.TreeMap;
 @Slf4j
 @Service
 public class WxPayService {
-
     private static final String JSCODE2SESSION_URL = "https://api.weixin.qq.com/sns/jscode2session";
     private static final String UNIFIED_ORDER_URL = "https://api.mch.weixin.qq.com/pay/unifiedorder";
     private static final String TRANSFER_URL = "https://api.mch.weixin.qq.com/mmpaymkttransfers/promotion/transfers";
-
     private final WxConfig wxConfig;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -34,7 +32,6 @@ public class WxPayService {
 
     /**
      * 小程序 code 换取 openid
-     *
      * @return openid, 失败返回 null
      */
     public String jsCode2Session(String code) {
@@ -60,7 +57,6 @@ public class WxPayService {
 
     /**
      * 统一下单
-     *
      * @param outTradeNo 商户订单号
      * @param totalFee   金额(分)
      * @param openid     支付者openid

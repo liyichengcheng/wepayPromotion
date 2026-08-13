@@ -30,7 +30,6 @@ public class UserService {
 
     /**
      * 小程序登录: code -> openid -> 创建/查询用户 -> 颁发 token
-     *
      * 分片路由策略:
      * openid 即为分片键, selectByOpenid 携带分片键实现精准路由 (1库1表)
      * ShardingSphere standard 策略按 openid HASH_MOD(4) 自动追加表后缀:

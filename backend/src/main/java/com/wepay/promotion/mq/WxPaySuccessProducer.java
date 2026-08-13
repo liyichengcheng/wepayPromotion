@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class WxPaySuccessProducer {
-
     public static final String TOPIC = "WX_PAY_SUCCESS_TOPIC";
     public static final String TAG = "commission";
 

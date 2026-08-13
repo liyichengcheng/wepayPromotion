@@ -9,7 +9,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/article")
 public class ArticleController {
-
     private final ArticleService articleService;
 
     public ArticleController(ArticleService articleService) {

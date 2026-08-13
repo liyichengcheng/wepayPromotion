@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.wepay.promotion.mapper.ArticleMapper">
-
-    <select id="selectByArticleId" resultType="com.wepay.promotion.entity.Article">
-        SELECT id, article_id, title, base_price, max_price, create_time
-        FROM t_article WHERE article_id = #{articleId}
-    </select>
-</mapper>

@@ -12,9 +12,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 public class ArticleService {
-
     private static final String PAY_TOTAL_KEY = "article:paytotal:%s";
-
     private final PayOrderMapper payOrderMapper;
     private final StringRedisTemplate redis;
 
