@@ -1,10 +1,12 @@
 package com.wepay.promotion.service;
 
 import com.wepay.promotion.common.BusinessException;
+import com.wepay.promotion.config.WxConfig;
 import com.wepay.promotion.dto.WxLoginVO;
 import com.wepay.promotion.entity.User;
 import com.wepay.promotion.interceptor.AuthInterceptor;
 import com.wepay.promotion.mapper.UserMapper;
+import com.wepay.promotion.util.CryptoUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -21,11 +23,14 @@ public class UserService {
     private final UserMapper userMapper;
     private final WxPayService wxPayService;
     private final StringRedisTemplate redis;
+    private final WxConfig wxConfig;
 
-    public UserService(UserMapper userMapper, WxPayService wxPayService, StringRedisTemplate redis) {
+    public UserService(UserMapper userMapper, WxPayService wxPayService,
+                       StringRedisTemplate redis, WxConfig wxConfig) {
         this.userMapper = userMapper;
         this.wxPayService = wxPayService;
         this.redis = redis;
+        this.wxConfig = wxConfig;
     }
 
     /**
@@ -68,10 +73,26 @@ public class UserService {
     }
 
     /**
-     * 生成此用户的专属分享链接
+     * 生成此用户的专属分享链接 (openid经AES-GCM加密)
      */
     public String buildShareLink(String openid) {
-        return String.format(SHARE_LINK_TEMPLATE, openid);
+        String encrypted = CryptoUtil.encrypt(openid, wxConfig.getShare().getAesKey());
+        return String.format(SHARE_LINK_TEMPLATE, encrypted);
+    }
+
+    /**
+     * 解密分享链接中的shareUid, 还原为openid
+     */
+    public String decryptShareUid(String shareUid) {
+        if (shareUid == null || shareUid.isEmpty()) {
+            return null;
+        }
+        try {
+            return CryptoUtil.decrypt(shareUid, wxConfig.getShare().getAesKey());
+        } catch (Exception e) {
+            log.warn("shareUid解密失败, 可能是旧版明文链接: {}", shareUid);
+            return shareUid;
+        }
     }
 
     public User getByOpenid(String openid) {

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 public class WxConfig {
     private MiniApp miniapp;
     private Pay pay;
+    private Share share;
 
     @Data
     public static class MiniApp {
@@ -24,5 +25,10 @@ public class WxConfig {
         private String notifyUrl;
         private String certPath;
         private String transferDesc;
+    }
+
+    @Data
+    public static class Share {
+        private String aesKey;
     }
 }

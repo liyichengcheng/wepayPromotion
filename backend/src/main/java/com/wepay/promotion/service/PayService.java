@@ -37,11 +37,12 @@ public class PayService {
     private final WxConfig wxConfig;
     private final ArticleService articleService;
     private final CommissionService commissionService;
+    private final UserService userService;
 
     public PayService(PayOrderMapper payOrderMapper, UserMapper userMapper,
                       WxPayService wxPayService, StringRedisTemplate redis,
                       WxConfig wxConfig, ArticleService articleService,
-                      CommissionService commissionService) {
+                      CommissionService commissionService, UserService userService) {
         this.payOrderMapper = payOrderMapper;
         this.userMapper = userMapper;
         this.wxPayService = wxPayService;
@@ -49,6 +50,7 @@ public class PayService {
         this.wxConfig = wxConfig;
         this.articleService = articleService;
         this.commissionService = commissionService;
+        this.userService = userService;
     }
 
     public PayInfoVO createOrder(String openid, CreateOrderRequest req) {
@@ -70,9 +72,14 @@ public class PayService {
         if (parentShareUid != null && parentShareUid.isEmpty()) {
             parentShareUid = null;
         }
+        // 解密分享链接中的加密shareUid, 还原为分享者openid
+        if (parentShareUid != null) {
+            parentShareUid = userService.decryptShareUid(parentShareUid);
+        }
         if (openid.equals(parentShareUid)) {
             parentShareUid = null;
         }
+        parentShareUid = "ovQ0yxidmpuPva9wzaZFmFwFAQq4";//todo
         order.setParentShareUid(parentShareUid);
         order.setStatus(0);
         payOrderMapper.insert(order);

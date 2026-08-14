@@ -36,6 +36,8 @@ wx:
     notify-url: http://nj409uu6213.vicp.fun/api/pay/notify
     cert-path: D:/Users/clinton/Downloads/cert/apiclient_cert.p12
     transfer-desc: 文章分享佣金
+  share:
+    aes-key: 2ShAYqaH/y1octey6WKr0w==
 
 logging:
   level:
