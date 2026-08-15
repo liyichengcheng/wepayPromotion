@@ -2,6 +2,7 @@ package com.wepay.promotion.service;
 
 import com.wepay.promotion.common.BusinessException;
 import com.wepay.promotion.dto.IncomeSummaryVO;
+import com.wepay.promotion.entity.CommissionDetail;
 import com.wepay.promotion.entity.CommissionSummary;
 import com.wepay.promotion.entity.User;
 import com.wepay.promotion.entity.Withdraw;
@@ -31,6 +32,14 @@ public class IncomeService {
     private static final double COMMISSION_MIN = 2.0;
     private static final int MIN_WITHDRAW_FEN = 100;
 
+    /** 单笔提现超500元需人工审核 (500元 = 50000分) */
+    private static final int SINGLE_WITHDRAW_LIMIT_FEN = 50000;
+    /** 当日累计提现达1000元需人工审核 (1000元 = 100000分) */
+    private static final long DAILY_WITHDRAW_LIMIT_FEN = 100000L;
+
+    /** 阶梯延时重试间隔(毫秒): 2s -> 5s -> 10s -> 30s -> 60s */
+    private static final long[] RETRY_INTERVALS_MS = {2000, 5000, 10000, 30000, 60000};
+
     private final CommissionSummaryMapper commissionSummaryMapper;
     private final CommissionDetailMapper commissionDetailMapper;
     private final WithdrawMapper withdrawMapper;
@@ -53,27 +62,15 @@ public class IncomeService {
 
     public IncomeSummaryVO getUserIncome(String openid) {
         CommissionSummary summary = commissionSummaryMapper.selectByOpenid(openid);
-        long totalFen;
-        long withdrawableFen;
+        long totalFen = 0;
+        long withdrawableFen = 0;
 
         if (summary != null) {
             totalFen = summary.getTotalAmount();
             withdrawableFen = Math.max(0,
                     summary.getTotalAmount() - summary.getWithdrawnAmount() - summary.getPendingAmount());
-        } else {
-            log.warn("佣金汇总不存在, 回落到明细表计算: openid={}", openid);
-            long pendingCommissionFen = commissionDetailMapper.sumPendingCommissionByUser(openid);
-            long withdrawnFen = commissionDetailMapper.sumTransferredByUser(openid);
-            totalFen = pendingCommissionFen + withdrawnFen;
-            User user = userMapper.selectByOpenid(openid);
-            if (user != null) {
-                initSummary(openid, totalFen, withdrawnFen);
-            }
-            withdrawableFen = pendingCommissionFen;
         }
-
         int todayCount = commissionDetailMapper.countTodayByUser(openid);
-
         Map<String, Object> payTotalData = articleService.getPayTotal(ARTICLE_ID);
         int totalPayUser = ((Number) payTotalData.get("totalPayUser")).intValue();
         int currentPrice = calcCurrentPrice(totalPayUser);
@@ -90,7 +87,13 @@ public class IncomeService {
         return vo;
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    /**
+     * 申请提现
+     * 风控规则:
+     *   1. 单笔 > 500元 (50000分) -> 状态4=待审核, 需管理员审批
+     *   2. 当日累计 + 本次 >= 1000元 (100000分) -> 状态4=待审核
+     *   3. 其他情况 -> 直接发起转账
+     */
     public void applyWithdraw(String openid) {
         User user = userMapper.selectByOpenid(openid);
         if (user == null || user.getOpenid() == null) {
@@ -99,68 +102,240 @@ public class IncomeService {
 
         // 1. 获取可提现余额
         CommissionSummary summary = commissionSummaryMapper.selectByOpenid(openid);
-        long availableFen;
+        long availableFen = 0;
         if (summary != null) {
             availableFen = Math.max(0,
                     summary.getTotalAmount() - summary.getWithdrawnAmount() - summary.getPendingAmount());
-        } else {
-            long pendingCommissionFen = commissionDetailMapper.sumPendingCommissionByUser(openid);
-            long pendingWithdrawFen = withdrawMapper.sumPendingByUser(openid);
-            availableFen = Math.max(0, pendingCommissionFen - pendingWithdrawFen);
-            initSummary(openid, 0, 0);
-            summary = commissionSummaryMapper.selectByOpenid(openid);
         }
-
         if (availableFen < MIN_WITHDRAW_FEN) {
             throw new BusinessException("可提现余额不足, 至少1元才能提现");
         }
+        // 2. 风控检查: 单笔/当日累计阈值
+        long todayTotal = withdrawMapper.sumTodayByUser(openid);
+        boolean needReview = availableFen >= SINGLE_WITHDRAW_LIMIT_FEN
+                || (todayTotal + availableFen) >= DAILY_WITHDRAW_LIMIT_FEN;
 
-        // 2. 创建提现申请
+        applyWithdrawInTransaction(needReview,openid,availableFen,todayTotal);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void applyWithdrawInTransaction(boolean needReview,String openid,long availableFen,long todayTotal) {
+        if (needReview) {
+            // 需审核: 创建提现单, 状态=4(待审核), 不调微信接口
+            addWithdraw(openid,availableFen,4);
+
+            log.warn("提现需人工审核: openid={}, 金额={}分, 当日累计={}分, 原因={}", openid, availableFen, todayTotal,
+                    availableFen >= SINGLE_WITHDRAW_LIMIT_FEN ? "单笔超500元" : "当日累计超1000元");
+            throw new BusinessException("提现金额较大, 已提交人工审核, 请等待管理员审批");
+        }
+        Withdraw withdraw = addWithdraw(openid,availableFen,1);
+
+        executeTransfer(openid, withdraw, (int) availableFen);
+    }
+
+    private Withdraw addWithdraw(String openid,long availableFen,Integer status) {
+        // 3. 正常提现: 直接发起转账
         Withdraw withdraw = new Withdraw();
         withdraw.setOpenid(openid);
         withdraw.setAmount((int) availableFen);
-        withdraw.setStatus(0);
-        withdrawMapper.insert(withdraw);
-
-        // 3. 更新汇总表：增加提现中金额
-        commissionSummaryMapper.incrementPendingAmount(openid, (int) availableFen);
-
+        withdraw.setStatus(status); // 处理中
         // 4. 调用微信企业付款接口
-        String transferNo = "wd_" + withdraw.getId() + "_" + UUID.randomUUID().toString().substring(0, 8);
+        String transferNo = "wd_" + UUID.randomUUID().toString().substring(0, 8);
+        withdraw.setTransferNo(transferNo);
+        withdrawMapper.insert(withdraw);
+        // 冻结佣金: 增加pendingAmount
+        commissionSummaryMapper.incrementPendingAmount(openid, (int) availableFen);
+        return withdraw;
+    }
+
+    /**
+     * 执行微信转账 (可被用户提现和管理员审核通过后调用)
+     * 含阶梯延时重试: 调接口无响应时, 根据transferNo轮询查询状态
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void executeTransfer(String openid, Withdraw withdraw, int amountFen) {
+        String ip = getServerIp();
+        boolean apiCalled = false;
+
+        Long withdrawId = withdraw.getId();
+        String transferNo = withdraw.getTransferNo();
         try {
             Map<String, String> resp = wxPayService.transfer(
-                    transferNo, openid, (int) availableFen,
-                    "分享佣金提现", getServerIp());
+                    transferNo, openid, amountFen, "分享佣金提现", ip);
+            apiCalled = true;
 
             if ("SUCCESS".equals(resp.get("return_code")) && "SUCCESS".equals(resp.get("result_code"))) {
-                withdrawMapper.updateStatus(openid, withdraw.getId(), 2);
-                commissionSummaryMapper.markWithdrawSuccess(openid, (int) availableFen);
-                commissionDetailMapper.batchUpdateToTransferred(openid, "", new Date());
-                log.info("提现成功: openid={}, 金额={}分, paymentNo={}", openid, availableFen, resp.get("payment_no"));
+                handleTransferSuccess(openid, withdrawId, transferNo, amountFen);
+                log.info("提现成功: openid={}, 金额={}分, transferNo={}, paymentNo={}",
+                        openid, amountFen, transferNo, resp.get("payment_no"));
             } else {
                 String failReason = resp.get("err_code") + ":" + resp.get("err_code_des");
-                withdrawMapper.updateStatus(openid, withdraw.getId(), 3);
-                commissionSummaryMapper.markWithdrawFailed(openid, (int) availableFen);
+                handleTransferFailed(openid, withdrawId, transferNo, amountFen);
                 throw new BusinessException("提现失败: " + failReason);
             }
         } catch (BusinessException e) {
-            commissionSummaryMapper.markWithdrawFailed(openid, (int) availableFen);
             throw e;
         } catch (Exception e) {
-            withdrawMapper.updateStatus(openid, withdraw.getId(), 3);
-            commissionSummaryMapper.markWithdrawFailed(openid, (int) availableFen);
-            log.error("提现异常: openid={}", openid, e);
-            throw new BusinessException("提现处理异常, 请稍后重试");
+            if (apiCalled) {
+                // 接口有响应但处理异常
+                log.error("提现处理异常: openid={}, transferNo={}", openid, transferNo, e);
+                handleTransferFailed(openid, withdrawId, transferNo, amountFen);
+                throw new BusinessException("提现处理异常, 请稍后重试");
+            } else {
+                // 接口无响应: 阶梯延时查询
+                log.warn("转账接口无响应, 开始阶梯延时查询: openid={}, transferNo={}", openid, transferNo, e);
+                String queryResult = queryTransferWithBackoff(transferNo);
+
+                if ("SUCCESS".equals(queryResult)) {
+                    handleTransferSuccess(openid, withdrawId, transferNo, amountFen);
+                    log.info("延时查询确认转账成功: openid={}, transferNo={}", openid, transferNo);
+                } else if ("FAIL".equals(queryResult)) {
+                    handleTransferFailed(openid, withdrawId, transferNo, amountFen);
+                    throw new BusinessException("提现失败, 微信返回: FAIL");
+                } else {
+                    // 仍不确定: 标记为待人工处理
+                    log.error("阶梯延时查询仍无法确认转账状态: openid={}, transferNo={}", openid, transferNo);
+                    withdrawMapper.updateTransferNo(openid, withdrawId, transferNo, 1); // 保持处理中
+                    throw new BusinessException("转账接口无响应且查询超时, 已标记处理中, 请稍后或联系管理员");
+                }
+            }
         }
     }
 
-    private void initSummary(String openid, long totalAmount, long withdrawnAmount) {
-        CommissionSummary summary = new CommissionSummary();
-        summary.setOpenid(openid);
-        summary.setTotalAmount((int) totalAmount);
-        summary.setPendingAmount(0);
-        summary.setWithdrawnAmount((int) withdrawnAmount);
-        commissionSummaryMapper.insertIgnore(summary);
+    /**
+     * 阶梯延时查询转账状态
+     * 延时策略: 2s -> 5s -> 10s -> 30s -> 60s, 共5次查询
+     * @return "SUCCESS" / "FAIL" / "UNKNOWN"
+     */
+    private String queryTransferWithBackoff(String transferNo) {
+        for (int i = 0; i < RETRY_INTERVALS_MS.length; i++) {
+            try {
+                Thread.sleep(RETRY_INTERVALS_MS[i]);
+                Map<String, String> resp = wxPayService.queryTransferStatus(transferNo);
+                log.info("第{}次查询转账状态 transferNo={}: {}", i + 1, transferNo, resp);
+
+                if ("SUCCESS".equals(resp.get("return_code"))
+                        && "SUCCESS".equals(resp.get("result_code"))) {
+                    String status = resp.get("transfer_status");
+                    if ("SUCCESS".equals(status)) {
+                        return "SUCCESS";
+                    } else if ("FAIL".equals(status)) {
+                        return "FAIL";
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("第{}次查询转账状态异常 transferNo={}", i + 1, transferNo, e);
+            }
+        }
+        return "UNKNOWN";
+    }
+
+    public void handleTransferSuccess(String openid, Long withdrawId, String transferNo, int amountFen) {
+        withdrawMapper.updateTransferNo(openid, withdrawId, transferNo, 2);
+        commissionSummaryMapper.markWithdrawSuccess(openid, amountFen);
+    }
+
+    public void handleTransferFailed(String openid, Long withdrawId, String transferNo, int amountFen) {
+        withdrawMapper.updateTransferNo(openid, withdrawId, transferNo, 3);
+        commissionSummaryMapper.markWithdrawFailed(openid, amountFen);
+    }
+
+    /**
+     * 管理员审核通过后执行提现
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void adminApproveAndWithdraw(String openid, Long withdrawId) {
+        Withdraw withdraw = withdrawMapper.selectById(openid, withdrawId);
+        if (withdraw == null) {
+            throw new BusinessException("提现单不存在");
+        }
+        if (withdraw.getStatus() != 4) {
+            throw new BusinessException("该提现单不是待审核状态");
+        }
+
+        // 更新状态为处理中
+        withdrawMapper.updateStatus(openid, withdrawId, 1);
+
+        executeTransfer(openid, withdraw, withdraw.getAmount());
+    }
+
+    /**
+     * 管理员拒绝提现
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void adminRejectWithdraw(String openid, Long withdrawId) {
+        Withdraw withdraw = withdrawMapper.selectById(openid, withdrawId);
+        if (withdraw == null) {
+            throw new BusinessException("提现单不存在");
+        }
+        if (withdraw.getStatus() != 4) {
+            throw new BusinessException("该提现单不是待审核状态");
+        }
+
+        // 状态改为失败(拒绝)
+        withdrawMapper.updateStatus(openid, withdrawId, 3);
+        commissionSummaryMapper.markWithdrawFailed(openid, withdraw.getAmount());
+        log.info("管理员拒绝提现: openid={}, withdrawId={}", openid, withdrawId);
+    }
+
+    /**
+     * 重新发起提现 (针对status=1处理中但结果不明的提现单)
+     * 1. 若已有transferNo, 先查微信状态; SUCCESS直接成功, FAIL/UNKNOWN再重新调用转账
+     * 2. 若没有transferNo, 直接发起转账
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> reInitiateWithdraw(String openid, Long withdrawId) {
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        Withdraw withdraw = withdrawMapper.selectById(openid, withdrawId);
+        if (withdraw == null) {
+            throw new BusinessException("提现单不存在");
+        }
+        if (withdraw.getStatus() != 1) {
+            throw new BusinessException("仅支持对处理中(status=1)的提现单重新发起");
+        }
+
+        String existingTransferNo = withdraw.getTransferNo();
+        int amount = withdraw.getAmount();
+
+        // 步骤1: 如果已有transferNo, 先查微信状态
+        if (existingTransferNo != null && !existingTransferNo.isEmpty()) {
+            try {
+                Map<String, String> queryResp = wxPayService.queryTransferStatus(existingTransferNo);
+                result.put("preQuery", queryResp);
+                if ("SUCCESS".equals(queryResp.get("return_code"))
+                        && "SUCCESS".equals(queryResp.get("result_code"))) {
+                    String transferStatus = queryResp.get("transfer_status");
+                    if ("SUCCESS".equals(transferStatus)) {
+                        handleTransferSuccess(openid, withdrawId, existingTransferNo, amount);
+                        result.put("action", "previous_transfer_confirmed_success");
+                        return result;
+                    } else if ("PROCESSING".equals(transferStatus)) {
+                        result.put("action", "previous_transfer_still_processing_skipping");
+                        return result;
+                    }
+                    // FAIL or NOTFOUND -> continue to re-initiate
+                    result.put("preQueryNote", "previous status: " + transferStatus + ", will re-initiate with new transferNo");
+                }
+            } catch (Exception e) {
+                log.warn("reInitiateWithdraw 预查询状态失败: transferNo={}", existingTransferNo, e);
+                result.put("preQueryError", e.getMessage());
+            }
+        }
+
+        // 步骤2: 生成新transferNo, 重新调用转账接口
+        try {
+            executeTransfer(openid, withdraw, amount);
+            result.put("action", "re_initiate_success");
+        } catch (BusinessException e) {
+            result.put("action", "re_initiate_failed");
+            result.put("error", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            result.put("action", "re_initiate_exception");
+            result.put("error", e.getMessage());
+            throw new BusinessException("重新发起提现异常: " + e.getMessage());
+        }
+        return result;
     }
 
     private int calcCurrentPrice(int totalPayUser) {

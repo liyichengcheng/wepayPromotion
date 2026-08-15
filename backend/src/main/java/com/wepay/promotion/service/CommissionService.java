@@ -67,7 +67,7 @@ public class CommissionService {
         detail.setOrderNo(orderNo);
         detail.setPayAmount(totalFee);
         detail.setCommissionAmount(commissionFen);
-        detail.setTransferTime(null); // 待提现时更新
+        detail.setTransferTime(null); //待提现时更新
         commissionDetailMapper.insert(detail);
 
         // 2. 初始化或更新佣金汇总

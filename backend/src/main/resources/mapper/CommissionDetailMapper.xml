@@ -43,11 +43,4 @@
         SELECT COUNT(*) FROM t_commission_detail
         WHERE openid = #{openid} AND DATE(create_time) = CURDATE()
     </select>
-
-    <!-- 按分片键 openid 批量更新为已提现 -> 精准路由 -->
-    <update id="batchUpdateToTransferred">
-        UPDATE t_commission_detail
-        SET transfer_time = #{transferTime}
-        WHERE openid = #{openid} AND transfer_time IS NULL
-    </update>
 </mapper>

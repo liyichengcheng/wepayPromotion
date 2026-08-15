@@ -22,9 +22,4 @@ public interface CommissionDetailMapper {
 
     /** 今日推广人数 */
     int countTodayByUser(@Param("openid") String openid);
-
-    /** 批量将用户待提现佣金更新为已提现 */
-    int batchUpdateToTransferred(@Param("openid") String openid,
-                                 @Param("paymentNo") String paymentNo,
-                                 @Param("transferTime") java.util.Date transferTime);
 }

@@ -10,7 +10,8 @@ public class Withdraw {
     private String openid;
     /** 提现金额(分) */
     private Integer amount;
-    /** 0=待处理 1=处理中 2=成功 3=失败 */
+    private String transferNo;
+    /** 0=待处理 1=处理中 2=成功 3=失败 4=待审核*/
     private Integer status;
     private Date applyTime;
     private Date updateTime;

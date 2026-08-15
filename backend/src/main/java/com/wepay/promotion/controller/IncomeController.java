@@ -29,11 +29,10 @@ public class IncomeController {
 
     /**
      * 申请提现(需登录)
-     * 佣金已自动转账至零钱, 此接口兼容前端保留
+     * 自动结算全部可提现余额, 风控规则: 单笔>500元或当日累计>=1000元需审核
      */
     @PostMapping("/applyWithdraw")
-    public Result<Void> applyWithdraw(@RequestBody(required = false) java.util.Map<String, String> body,
-                                      HttpServletRequest request) {
+    public Result<Void> applyWithdraw(HttpServletRequest request) {
         String openid = (String) request.getAttribute(AuthInterceptor.CURRENT_OPENID);
         incomeService.applyWithdraw(openid);
         return Result.success();

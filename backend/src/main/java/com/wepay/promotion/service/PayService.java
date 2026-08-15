@@ -29,6 +29,15 @@ public class PayService {
     public static final int PAY_VALID_DAYS = 30;
     private static final String UNLOCK_KEY = "pay:unlock:%s:%s";
     private static final String ORDER_BODY = "文章阅读-学渣逆袭";
+    /** 支付回调以 orderNo 为粒度的分布式锁 key 前缀 */
+    private static final String NOTIFY_LOCK_KEY = "pay:notify:lock:%s";
+    /** 锁持有时间(秒), 超过此时间自动释放, 防止死锁 */
+    private static final long NOTIFY_LOCK_LEASE_SECONDS = 30L;
+    /** Lua 脚本: 仅当 value 匹配(锁属于当前持有者)时才删除, 避免误释放他人锁 */
+    private static final String UNLOCK_LUA =
+            "if redis.call('get', KEYS[1]) == ARGV[1] then " +
+            "  return redis.call('del', KEYS[1]) " +
+            "else return 0 end";
 
     private final PayOrderMapper payOrderMapper;
     private final UserMapper userMapper;
@@ -101,11 +110,6 @@ public class PayService {
         return WxPayUtil.buildJsapiPayInfo(wxConfig.getMiniapp().getAppid(), prepayId, wxConfig.getPay().getMchKey());
     }
 
-    /**
-     * 微信支付回调处理
-     * 注: 已付费状态仅通过 Redis 缓存(30天TTL)维护
-     */
-    @Transactional(rollbackFor = Exception.class)
     public String handleNotify(String xmlRaw) {
         Map<String, String> params;
         try {
@@ -129,6 +133,43 @@ public class PayService {
         String transactionId = params.get("transaction_id");
         String openid = params.get("openid");
 
+        // 以 orderNo 为粒度加分布式锁, 防止微信重复回调导致并发处理同一订单
+        String lockKey = String.format(NOTIFY_LOCK_KEY, orderNo);
+        String lockValue = UUID.randomUUID().toString();
+        Boolean locked = redis.opsForValue()
+                .setIfAbsent(lockKey, lockValue, NOTIFY_LOCK_LEASE_SECONDS, TimeUnit.SECONDS);
+        if (Boolean.FALSE.equals(locked)) {
+            // 已有其它线程正在处理该 orderNo, 直接返回 SUCCESS 让微信停止重试 (幂等)
+            log.warn("orderNo={} 正在被其它线程处理, 跳过本次回调", orderNo);
+            return notifyFail("前次回调未处理完毕");
+        }
+
+        String resp;
+        try {
+            resp = handleNotify2(orderNo, transactionId, openid);
+        } finally {
+            // 安全释放锁: 仅当 value 仍为当前持有者时才删除
+            try {
+                redis.execute((org.springframework.data.redis.core.RedisCallback<Long>) connection -> {
+                    byte[] keyBytes = redis.getStringSerializer().serialize(lockKey);
+                    byte[] valBytes = redis.getStringSerializer().serialize(lockValue);
+                    return connection.eval(UNLOCK_LUA.getBytes(), org.springframework.data.redis.connection.ReturnType.INTEGER,
+                            1, keyBytes, valBytes);
+                });
+            } catch (Exception e) {
+                log.warn("释放回调锁失败 orderNo={}, lockKey={}", orderNo, lockKey, e);
+            }
+        }
+
+        return resp;
+    }
+
+    /**
+     * 微信支付回调处理
+     * 注: 已付费状态仅通过 Redis 缓存(30天TTL)维护
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public String handleNotify2(String orderNo,String transactionId,String openid) {
         // 支付回调只有 order_no 没有分片键 openid:
         // ShardingSphere standard 策略的 SELECT 缺少分片键时自动广播到
         // 4 表 = 16 物理分片, 自动追加后缀: ds{N}.t_pay_order_{M}

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>佣金提现审核 - 管理后台</title>
+    <link rel="stylesheet" href="./css/style.css">
+    <!-- JSEncrypt: 用于前端RSA加密新密码 -->
+    <script src="https://cdn.jsdelivr.net/npm/jsencrypt@3.3.2/bin/jsencrypt.min.js"></script>
+</head>
+<body>
+    <div class="admin-page">
+        <!-- 顶部导航 -->
+        <div class="nav-bar">
+            <div class="nav-left">
+                <div class="nav-logo">管</div>
+                <div class="nav-title">佣金提现审核后台</div>
+            </div>
+            <div class="nav-right">
+                <button class="btn-logout" onclick="openChangePwd()">修改密码</button>
+                <span class="nav-user">管理员：admin</span>
+                <button class="btn-logout" onclick="doLogout()">退出</button>
+            </div>
+        </div>
+
+        <div class="page-content">
+            <!-- Tab 切换 -->
+            <div class="tab-bar">
+                <div class="tab-item active" data-tab="pending" onclick="switchTab('pending')">
+                    待处理 <span id="pendingCount" style="margin-left:6px;padding:2px 8px;background:rgba(7,193,96,.15);color:#07c160;border-radius:20px;font-size:12px;">0</span>
+                </div>
+                <div class="tab-item" data-tab="all" onclick="switchTab('all')">
+                    全部提现记录
+                </div>
+                <div class="tab-item" data-tab="query" onclick="switchTab('query')">
+                    处理中提现状态追踪 <span id="processingCount" style="margin-left:6px;padding:2px 8px;background:rgba(59,130,246,.15);color:#1d4ed8;border-radius:20px;font-size:12px;">0</span>
+                </div>
+            </div>
+
+            <!-- 待处理提现列表 -->
+            <div id="tab-pending" class="tab-pane">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">待审核 / 处理中提现</div>
+                        <div class="card-action">
+                            <button class="btn-refresh" onclick="loadPendingList()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                刷新
+                            </button>
+                        </div>
+                    </div>
+                    <div id="pendingTable"></div>
+                </div>
+            </div>
+
+            <!-- 全部提现记录 -->
+            <div id="tab-all" class="tab-pane" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">全部提现记录</div>
+                        <div class="card-action">
+                            <button class="btn-refresh" onclick="loadAllList()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                刷新
+                            </button>
+                        </div>
+                    </div>
+                    <div id="allTable"></div>
+                </div>
+            </div>
+
+            <!-- 处理中提现状态追踪 (新) -->
+            <div id="tab-query" class="tab-pane" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">处理中提现 (status=1) 状态追踪</div>
+                        <div class="card-action">
+                            <button class="btn-refresh" onclick="loadProcessingList()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                刷新
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="query-row" style="margin-bottom:20px;">
+                        <div class="form-group" style="flex:1;">
+                            <input class="form-input" type="text" id="queryTransferNo" placeholder="或单独输入商户转账单号 transferNo 查询">
+                        </div>
+                        <button class="btn-outline" onclick="queryTransfer()">单独查询微信状态</button>
+                    </div>
+
+                    <div id="processingTable"></div>
+
+                    <!-- 查询结果面板 -->
+                    <div id="queryResult"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹窗容器 -->
+    <div id="modalContainer"></div>
+
+    <script src="./js/app.js"></script>
+</body>
+</html>

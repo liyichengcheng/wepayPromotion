@@ -43,3 +43,7 @@ logging:
   level:
     com.wepay.promotion: debug
     org.apache.shardingsphere: debug
+
+# 管理员后台密码 (Basic Auth)
+admin:
+  password: admin123

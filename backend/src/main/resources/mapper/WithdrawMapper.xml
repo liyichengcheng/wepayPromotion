@@ -9,8 +9,8 @@
 
     <!-- 插入: 必须带 openid (分片键), 精准路由到对应分片 -->
     <insert id="insert" parameterType="com.wepay.promotion.entity.Withdraw" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO t_withdraw (openid, amount, status)
-        VALUES (#{openid}, #{amount}, #{status})
+        INSERT INTO t_withdraw (openid, amount, transfer_no, status)
+        VALUES (#{openid}, #{amount}, #{transferNo}, #{status})
     </insert>
 
     <!-- 按分片键 openid 汇总已成功提现金额 -> 精准路由 -->
@@ -19,18 +19,65 @@
         WHERE openid = #{openid} AND status = 2
     </select>
 
-    <!-- 按分片键 openid 汇总处理中提现金额 -> 精准路由 -->
+    <!-- 按分片键 openid 汇总处理中(含待审核)提现金额 -> 精准路由 -->
     <select id="sumPendingByUser" resultType="java.lang.Long">
         SELECT COALESCE(SUM(amount), 0) FROM t_withdraw
-        WHERE openid = #{openid} AND status IN (0, 1)
+        WHERE openid = #{openid} AND status IN (0, 1, 4)
+    </select>
+
+    <!-- 当日提现累计(含所有非失败状态, 用于风控) -->
+    <select id="sumTodayByUser" resultType="java.lang.Long">
+        SELECT COALESCE(SUM(amount), 0) FROM t_withdraw
+        WHERE openid = #{openid} AND status IN (0, 1, 2, 4)
+          AND DATE(apply_time) = CURDATE()
     </select>
 
     <!--
       更新提现单状态: 必须携带分片键 openid + id 实现精准路由
-      调用方需从已查询/插入的 Withdraw 实体中取 openid 传入
     -->
     <update id="updateStatus">
         UPDATE t_withdraw SET status = #{status}, update_time = NOW()
         WHERE openid = #{openid} AND id = #{id}
     </update>
+
+    <!--
+      更新transferNo和状态: 转账接口返回后回填
+    -->
+    <update id="updateTransferNo">
+        UPDATE t_withdraw SET transfer_no = #{transferNo}, status = #{status}, update_time = NOW()
+        WHERE openid = #{openid} AND id = #{id}
+    </update>
+
+    <!-- 按ID查询(需分片键精准路由) -->
+    <select id="selectById" resultType="com.wepay.promotion.entity.Withdraw">
+        SELECT id, openid, amount, transfer_no AS transferNo, status, apply_time, update_time
+        FROM t_withdraw WHERE openid = #{openid} AND id = #{id}
+    </select>
+
+    <!-- 按transferNo查询(需分片键精准路由) -->
+    <select id="selectByTransferNo" resultType="com.wepay.promotion.entity.Withdraw">
+        SELECT id, openid, amount, transfer_no AS transferNo, status, apply_time, update_time
+        FROM t_withdraw WHERE openid = #{openid} AND transfer_no = #{transferNo}
+    </select>
+
+    <!-- 查询待审核/处理中的提现(广播查询, 用于后台管理) -->
+    <select id="selectPendingReview" resultType="com.wepay.promotion.entity.Withdraw">
+        SELECT id, openid, amount, transfer_no AS transferNo, status, apply_time, update_time
+        FROM t_withdraw WHERE status IN (0, 1, 4)
+        ORDER BY apply_time DESC LIMIT 200
+    </select>
+
+    <!-- 查询所有处理中(status=1)的提现(广播查询, 用于转账状态查询Tab) -->
+    <select id="selectProcessingOnly" resultType="com.wepay.promotion.entity.Withdraw">
+        SELECT id, openid, amount, transfer_no AS transferNo, status, apply_time, update_time
+        FROM t_withdraw WHERE status = 1
+        ORDER BY apply_time DESC LIMIT 500
+    </select>
+
+    <!-- 查询所有提现单(广播查询, 用于后台管理) -->
+    <select id="selectAll" resultType="com.wepay.promotion.entity.Withdraw">
+        SELECT id, openid, amount, transfer_no AS transferNo, status, apply_time, update_time
+        FROM t_withdraw
+        ORDER BY apply_time DESC LIMIT 500
+    </select>
 </mapper>
