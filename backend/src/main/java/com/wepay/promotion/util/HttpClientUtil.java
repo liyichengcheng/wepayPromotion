@@ -52,7 +52,6 @@ public class HttpClientUtil {
 
     /**
      * 带商户证书的 HTTPS POST (用于企业付款到零钱等需证书接口)
-     *
      * @param certPath apiclient_cert.p12 绝对路径
      * @param mchId    商户号(证书密码)
      */
@@ -65,7 +64,7 @@ public class HttpClientUtil {
                 .loadKeyMaterial(keyStore, mchId.toCharArray())
                 .build();
         SSLConnectionSocketFactory sslFactory = new SSLConnectionSocketFactory(
-                sslContext, new String[]{"TLSv1"}, null,
+                sslContext, new String[]{"TLSv1.2", "TLSv1.3"}, null,
                 SSLConnectionSocketFactory.getDefaultHostnameVerifier());
         try (CloseableHttpClient client = HttpClients.custom().setSSLSocketFactory(sslFactory).build()) {
             HttpPost post = new HttpPost(url);

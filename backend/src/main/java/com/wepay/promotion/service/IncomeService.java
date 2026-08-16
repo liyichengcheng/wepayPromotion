@@ -11,6 +11,7 @@ import com.wepay.promotion.mapper.CommissionSummaryMapper;
 import com.wepay.promotion.mapper.UserMapper;
 import com.wepay.promotion.mapper.WithdrawMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,11 +21,11 @@ import java.net.InetAddress;
 import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 public class IncomeService {
-
     private static final long ARTICLE_ID = 10001L;
     private static final int BASE_PRICE = 6;
     private static final int MAX_PRICE = 20;
@@ -40,24 +41,40 @@ public class IncomeService {
     /** 阶梯延时重试间隔(毫秒): 2s -> 5s -> 10s -> 30s -> 60s */
     private static final long[] RETRY_INTERVALS_MS = {2000, 5000, 10000, 30000, 60000};
 
+    /** 提现分布式锁 key 前缀 (openid 粒度), 防并发提交 */
+    private static final String WITHDRAW_LOCK_KEY = "withdraw:lock:%s";
+    /** 锁租约(秒) */
+    private static final long WITHDRAW_LOCK_LEASE_SECONDS = 30L;
+    /** 提现限流 key 前缀 (openid 粒度), 每小时只能提现一次 */
+    private static final String WITHDRAW_RATE_LIMIT_KEY = "withdraw:ratelimit:%s";
+    /** 限流窗口(小时) */
+    private static final long WITHDRAW_RATE_LIMIT_HOURS = 1L;
+    /** Lua 脚本: 仅当 value 匹配(锁属于当前持有者)时才删除, 避免误释放 */
+    private static final String UNLOCK_LUA =
+            "if redis.call('get', KEYS[1]) == ARGV[1] then " +
+            "  return redis.call('del', KEYS[1]) " +
+            "else return 0 end";
+
     private final CommissionSummaryMapper commissionSummaryMapper;
     private final CommissionDetailMapper commissionDetailMapper;
     private final WithdrawMapper withdrawMapper;
     private final UserMapper userMapper;
     private final WxPayService wxPayService;
     private final ArticleService articleService;
+    private final StringRedisTemplate redis;
 
     public IncomeService(CommissionSummaryMapper commissionSummaryMapper,
                         CommissionDetailMapper commissionDetailMapper,
                         WithdrawMapper withdrawMapper,
                         UserMapper userMapper, WxPayService wxPayService,
-                        ArticleService articleService) {
+                        ArticleService articleService, StringRedisTemplate redis) {
         this.commissionSummaryMapper = commissionSummaryMapper;
         this.commissionDetailMapper = commissionDetailMapper;
         this.withdrawMapper = withdrawMapper;
         this.userMapper = userMapper;
         this.wxPayService = wxPayService;
         this.articleService = articleService;
+        this.redis = redis;
     }
 
     public IncomeSummaryVO getUserIncome(String openid) {
@@ -93,8 +110,24 @@ public class IncomeService {
      *   1. 单笔 > 500元 (50000分) -> 状态4=待审核, 需管理员审批
      *   2. 当日累计 + 本次 >= 1000元 (100000分) -> 状态4=待审核
      *   3. 其他情况 -> 直接发起转账
+     * 并发控制: 以 openid 为粒度加 Redis 分布式锁, 防并发提交
+     * 限流: 同一 openid 每小时只能调用一次
+     * @param openid     用户openid
+     * @param amountFen  提现金额(分)
      */
-    public void applyWithdraw(String openid) {
+    public void applyWithdraw(String openid, Integer amountFen) {
+//        if (amountFen == null || amountFen < MIN_WITHDRAW_FEN) {
+//            throw new BusinessException("提现金额至少1元");
+//        } //todo
+
+        // 以 openid 为粒度加分布式锁, 防止并发提交提现请求
+        String lockKey = String.format(WITHDRAW_LOCK_KEY, openid);
+        Boolean locked = redis.opsForValue()
+                .setIfAbsent(lockKey, "1", WITHDRAW_RATE_LIMIT_HOURS, TimeUnit.HOURS);
+        if (Boolean.FALSE.equals(locked)) {
+            throw new BusinessException("每小时只能提现一次, 请稍后再试");
+        }
+
         User user = userMapper.selectByOpenid(openid);
         if (user == null || user.getOpenid() == null) {
             throw new BusinessException("用户不存在或未绑定openid");
@@ -107,30 +140,30 @@ public class IncomeService {
             availableFen = Math.max(0,
                     summary.getTotalAmount() - summary.getWithdrawnAmount() - summary.getPendingAmount());
         }
-        if (availableFen < MIN_WITHDRAW_FEN) {
-            throw new BusinessException("可提现余额不足, 至少1元才能提现");
+        if (availableFen < amountFen) {
+            throw new BusinessException("可提现余额不足");
         }
         // 2. 风控检查: 单笔/当日累计阈值
         long todayTotal = withdrawMapper.sumTodayByUser(openid);
-        boolean needReview = availableFen >= SINGLE_WITHDRAW_LIMIT_FEN
-                || (todayTotal + availableFen) >= DAILY_WITHDRAW_LIMIT_FEN;
+        boolean needReview = amountFen >= SINGLE_WITHDRAW_LIMIT_FEN
+                || (todayTotal + amountFen) >= DAILY_WITHDRAW_LIMIT_FEN;
 
-        applyWithdrawInTransaction(needReview,openid,availableFen,todayTotal);
+        applyWithdrawInTransaction(needReview, openid, amountFen, todayTotal);
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void applyWithdrawInTransaction(boolean needReview,String openid,long availableFen,long todayTotal) {
+    public void applyWithdrawInTransaction(boolean needReview, String openid, long amountFen, long todayTotal) {
         if (needReview) {
             // 需审核: 创建提现单, 状态=4(待审核), 不调微信接口
-            addWithdraw(openid,availableFen,4);
+            addWithdraw(openid, amountFen, 4);
 
-            log.warn("提现需人工审核: openid={}, 金额={}分, 当日累计={}分, 原因={}", openid, availableFen, todayTotal,
-                    availableFen >= SINGLE_WITHDRAW_LIMIT_FEN ? "单笔超500元" : "当日累计超1000元");
+            log.warn("提现需人工审核: openid={}, 金额={}分, 当日累计={}分, 原因={}", openid, amountFen, todayTotal,
+                    amountFen >= SINGLE_WITHDRAW_LIMIT_FEN ? "单笔超500元" : "当日累计超1000元");
             throw new BusinessException("提现金额较大, 已提交人工审核, 请等待管理员审批");
         }
-        Withdraw withdraw = addWithdraw(openid,availableFen,1);
+        Withdraw withdraw = addWithdraw(openid, amountFen, 1);
 
-        executeTransfer(openid, withdraw, (int) availableFen);
+        executeTransfer(openid, withdraw, (int) amountFen);
     }
 
     private Withdraw addWithdraw(String openid,long availableFen,Integer status) {
@@ -139,8 +172,8 @@ public class IncomeService {
         withdraw.setOpenid(openid);
         withdraw.setAmount((int) availableFen);
         withdraw.setStatus(status); // 处理中
-        // 4. 调用微信企业付款接口
-        String transferNo = "wd_" + UUID.randomUUID().toString().substring(0, 8);
+        // 4. 调用微信企业付款接口 (partner_trade_no 只能是字母或数字, 不能含下划线)
+        String transferNo = "wd" + System.currentTimeMillis() + UUID.randomUUID().toString().substring(0, 6);
         withdraw.setTransferNo(transferNo);
         withdrawMapper.insert(withdraw);
         // 冻结佣金: 增加pendingAmount
@@ -174,6 +207,7 @@ public class IncomeService {
                 throw new BusinessException("提现失败: " + failReason);
             }
         } catch (BusinessException e) {
+            log.error("",e);
             throw e;
         } catch (Exception e) {
             if (apiCalled) {
@@ -255,7 +289,6 @@ public class IncomeService {
 
         // 更新状态为处理中
         withdrawMapper.updateStatus(openid, withdrawId, 1);
-
         executeTransfer(openid, withdraw, withdraw.getAmount());
     }
 
@@ -360,6 +393,22 @@ public class IncomeService {
             return InetAddress.getLocalHost().getHostAddress();
         } catch (Exception e) {
             return "127.0.0.1";
+        }
+    }
+
+    /**
+     * 安全释放分布式锁: 仅当 value 匹配(锁属于当前持有者)时才删除, 避免误释放他人锁
+     */
+    private void releaseLock(String lockKey, String lockValue) {
+        try {
+            redis.execute((org.springframework.data.redis.core.RedisCallback<Long>) connection -> {
+                byte[] keyBytes = redis.getStringSerializer().serialize(lockKey);
+                byte[] valBytes = redis.getStringSerializer().serialize(lockValue);
+                return connection.eval(UNLOCK_LUA.getBytes(),
+                        org.springframework.data.redis.connection.ReturnType.INTEGER, 1, keyBytes, valBytes);
+            });
+        } catch (Exception e) {
+            log.warn("释放提现锁失败 lockKey={}", lockKey, e);
         }
     }
 }

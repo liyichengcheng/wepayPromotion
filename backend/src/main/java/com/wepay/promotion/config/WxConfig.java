@@ -25,6 +25,13 @@ public class WxConfig {
         private String notifyUrl;
         private String certPath;
         private String transferDesc;
+        /**
+         * 开发环境Mock模式:
+         * 当微信商户尚未开通「企业付款到零钱」导致 NO_AUTH 时,
+         * 设为 true 可模拟微信返回成功, 让主流程跑通以便调试.
+         * 生产环境务必保持 false/不填.
+         */
+        private Boolean mockTransfer = Boolean.FALSE;
     }
 
     @Data

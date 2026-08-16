@@ -36,6 +36,8 @@ wx:
     notify-url: http://nj409uu6213.vicp.fun/api/pay/notify
     cert-path: D:/Users/clinton/Downloads/cert/apiclient_cert.p12
     transfer-desc: 文章分享佣金
+    # 开发环境Mock转账: 商户未开通「企业付款到零钱」(NO_AUTH) 时设为 true 模拟成功, 生产必须 false
+    mock-transfer: true
   share:
     aes-key: 2ShAYqaH/y1octey6WKr0w==
 

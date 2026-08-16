@@ -107,11 +107,41 @@ public class WxPayService {
         params.put("spbill_create_ip", ip);
         params.put("sign", WxPayUtil.sign(params, wxConfig.getPay().getMchKey()));
 
+        // 调试日志: 打印调用参数(除签名)以便排查 NO_AUTH 等配置问题
+        if (log.isInfoEnabled()) {
+            SortedMap<String, String> debug = new TreeMap<>(params);
+            debug.remove("sign");
+            log.info("企业付款入参(无签名): url={}, params={}", TRANSFER_URL, debug);
+        }
+
         String xml = WxPayUtil.mapToXml(params);
-        String resp = HttpClientUtil.postXmlWithCert(TRANSFER_URL, xml,
-                wxConfig.getPay().getCertPath(), wxConfig.getPay().getMchId());
+        String resp;
+        try {
+            resp = HttpClientUtil.postXmlWithCert(TRANSFER_URL, xml,
+                    wxConfig.getPay().getCertPath(), wxConfig.getPay().getMchId());
+        } catch (javax.net.ssl.SSLHandshakeException sslEx) {
+            // SSL协议错误 (TLSv1 被禁用), 直接抛出明确提示
+            log.error("企业付款 SSL 握手失败, 请检查 HttpClientUtil 是否指定了 TLSv1.2+", sslEx);
+            throw new RuntimeException("SSL握手失败: " + sslEx.getMessage());
+        }
+
         log.info("企业付款返回: {}", resp);
-        return WxPayUtil.xmlToMap(resp);
+        Map<String, String> result = WxPayUtil.xmlToMap(resp);
+
+        // NO_AUTH 兜底: 若配置了 mockTransfer=true, 模拟微信返回成功, 便于本地调试
+        if ("NO_AUTH".equals(result.get("err_code"))
+                && Boolean.TRUE.equals(wxConfig.getPay().getMockTransfer())) {
+            log.warn("⚠️ 企业付款返回 NO_AUTH, 命中 mockTransfer=true, 模拟转账成功 (仅开发环境使用!)");
+            Map<String, String> mock = new TreeMap<>();
+            mock.put("return_code", "SUCCESS");
+            mock.put("result_code", "SUCCESS");
+            mock.put("partner_trade_no", partnerTradeNo);
+            mock.put("payment_no", "MOCK" + System.currentTimeMillis());
+            mock.put("payment_time", new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date()));
+            return mock;
+        }
+
+        return result;
     }
 
     /**

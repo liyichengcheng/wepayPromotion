@@ -1,6 +1,7 @@
 package com.wepay.promotion.controller;
 
 import com.wepay.promotion.common.Result;
+import com.wepay.promotion.dto.ApplyWithdrawRequest;
 import com.wepay.promotion.dto.IncomeSummaryVO;
 import com.wepay.promotion.interceptor.AuthInterceptor;
 import com.wepay.promotion.service.IncomeService;
@@ -29,12 +30,13 @@ public class IncomeController {
 
     /**
      * 申请提现(需登录)
-     * 自动结算全部可提现余额, 风控规则: 单笔>500元或当日累计>=1000元需审核
+     * 风控规则: 单笔>500元或当日累计>=1000元需审核
+     * 限流: 同一openid每小时只能调用一次
      */
     @PostMapping("/applyWithdraw")
-    public Result<Void> applyWithdraw(HttpServletRequest request) {
+    public Result<Void> applyWithdraw(@RequestBody ApplyWithdrawRequest req, HttpServletRequest request) {
         String openid = (String) request.getAttribute(AuthInterceptor.CURRENT_OPENID);
-        incomeService.applyWithdraw(openid);
+        incomeService.applyWithdraw(openid, req.getAmount());
         return Result.success();
     }
 }
