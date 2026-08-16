@@ -168,7 +168,7 @@ function renderTraceButtons(item) {
 
 /* ========== 加载列表 ========== */
 function loadPendingList() {
-    api('/admin/withdraw/pending').then(data => {
+    api('/api/admin/withdraw/pending').then(data => {
         const list = (data && data.data) || data || [];
         document.getElementById('pendingCount').textContent = list.length;
         renderTable('pendingTable', list, { showReview: true, showQuery: true });
@@ -180,7 +180,7 @@ function loadPendingList() {
 }
 
 function loadAllList() {
-    api('/admin/withdraw/list').then(data => {
+    api('/api/admin/withdraw/list').then(data => {
         const list = (data && data.data) || data || [];
         renderTable('allTable', list, { showReview: true, showQuery: true });
     }).catch(err => {
@@ -191,7 +191,7 @@ function loadAllList() {
 }
 
 function loadProcessingList() {
-    api('/admin/withdraw/processing').then(data => {
+    api('/api/admin/withdraw/processing').then(data => {
         const list = (data && data.data) || data || [];
         document.getElementById('processingCount').textContent = list.length;
         // 转账状态追踪Tab: 每行2个按钮 重查微信状态 + 重新发起提现
@@ -236,7 +236,7 @@ function openApprove(id, openid, amount) {
 }
 
 function doApprove(id, openid) {
-    api('/admin/withdraw/approve', { method: 'POST', body: { openid, withdrawId: id } })
+    api('/api/admin/withdraw/approve', { method: 'POST', body: { openid, withdrawId: id } })
         .then(() => {
             showToast('审核通过，打款操作已执行', 'success');
             closeModal();
@@ -261,7 +261,7 @@ function openReject(id, openid, amount) {
 }
 
 function doReject(id, openid) {
-    api('/admin/withdraw/reject', { method: 'POST', body: { openid, withdrawId: id } })
+    api('/api/admin/withdraw/reject', { method: 'POST', body: { openid, withdrawId: id } })
         .then(() => {
             showToast('已拒绝该提现申请', 'success');
             closeModal();
@@ -286,7 +286,7 @@ function queryTransfer() {
         return;
     }
     showToast('查询中...', 'info');
-    api('/admin/withdraw/queryTransfer?transferNo=' + encodeURIComponent(transferNo))
+    api('/api/admin/withdraw/queryTransfer?transferNo=' + encodeURIComponent(transferNo))
         .then(data => {
             const res = (data && data.data) || data || {};
             let jsonHtml = '';
@@ -320,7 +320,7 @@ function quickQueryAndShow(id, openid, transferNo) {
     }
     showToast('查询中...', 'info');
     // 调用 retry 接口: 根据transferNo查状态,并自动更新数据
-    api('/admin/withdraw/retry', { method: 'POST', body: { openid, withdrawId: id } })
+    api('/api/admin/withdraw/retry', { method: 'POST', body: { openid, withdrawId: id } })
         .then(data => {
             const res = (data && data.data) || data || {};
             const actions = {
@@ -354,7 +354,7 @@ function openRetry(id, openid) {
 }
 
 function doRetry(id, openid) {
-    api('/admin/withdraw/retry', { method: 'POST', body: { openid, withdrawId: id } })
+    api('/api/admin/withdraw/retry', { method: 'POST', body: { openid, withdrawId: id } })
         .then(data => {
             const res = (data && data.data) || data || {};
             openModal('重试对账结果',
@@ -395,7 +395,7 @@ function openReInitiate(id, openid, amount, transferNo) {
 
 function doReInitiate(id, openid) {
     showToast('处理中...', 'info');
-    api('/admin/withdraw/reInitiate', { method: 'POST', body: { openid, withdrawId: id } })
+    api('/api/admin/withdraw/reInitiate', { method: 'POST', body: { openid, withdrawId: id } })
         .then(data => {
             const res = (data && data.data) || data || {};
             openModal(`重新发起结果 - 提现单#${id}`,
@@ -451,7 +451,7 @@ function doChangePwd() {
 
     showToast('正在加密并提交...', 'info');
     // 1. 先获取 RSA 公钥
-    api('/admin/publicKey').then(data => {
+    api('/api/admin/publicKey').then(data => {
         const pubKey = (data && data.data) || data;
         if (!pubKey) throw new Error('获取公钥失败');
 

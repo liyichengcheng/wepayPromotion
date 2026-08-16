@@ -47,7 +47,7 @@
 
             const creds = btoa(username + ':' + password);
             // 调用一个管理API来验证
-            fetch('../api/admin/withdraw/pending', {
+            fetch('../admin/withdraw/pending', {
                 headers: {
                     'Authorization': 'Basic ' + creds
                 }
