@@ -33,6 +33,9 @@
       <view class="stat-income">{{withdrawMoney}}</view>
       <view class="stat-unit">元</view>
       <view class="stat-sub">可提现</view>
+      <view class="withdraw-btn" bindtap="openWithdrawModal">
+        <text>提现</text>
+      </view>
     </view>
   </view>
 
@@ -46,4 +49,33 @@
   <button class="share-action" open-type="share">
     <text>立即分享给好友</text>
   </button>
+
+  <!-- 提现弹窗 -->
+  <view class="modal-mask" wx:if="{{showWithdrawModal}}" bindtap="closeWithdrawModal"></view>
+  <view class="withdraw-modal" wx:if="{{showWithdrawModal}}">
+    <view class="withdraw-modal-header">
+      <text class="withdraw-modal-title">申请提现</text>
+    </view>
+    <view class="withdraw-modal-body">
+      <view class="withdraw-modal-notice">
+        <text>单笔大于500元及当日提现达到1000元后，经审核后3天内到账</text>
+      </view>
+      <view class="withdraw-input-row">
+        <text class="withdraw-input-label">提现金额</text>
+        <view class="withdraw-input-wrapper">
+          <text class="withdraw-input-currency">¥</text>
+          <input class="withdraw-input" type="digit" placeholder="请输入提现金额" value="{{withdrawInput}}" bindinput="onWithdrawInput" />
+        </view>
+        <text class="withdraw-input-hint">最多可提现 ¥{{withdrawMoney}}</text>
+      </view>
+    </view>
+    <view class="withdraw-modal-footer">
+      <view class="withdraw-modal-cancel" bindtap="closeWithdrawModal">
+        <text>取消</text>
+      </view>
+      <view class="withdraw-modal-confirm" bindtap="confirmWithdraw">
+        <text>确定</text>
+      </view>
+    </view>
+  </view>
 </view>

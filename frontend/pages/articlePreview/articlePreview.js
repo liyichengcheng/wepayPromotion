@@ -1,10 +1,10 @@
 const app = getApp()
 Page({
   data: {
-    price: 6,
+    price: 1,
     payCount: 912,
     progressPercent: 9.12,
-    isPaying: true,
+    isPaying: false,
     hasReadArticle: false,
     showPayModal: true,
     evidenceImages: [
@@ -32,7 +32,6 @@ Page({
 
     const hasReadArticle = wx.getStorageSync("hasReadArticle")
     this.setData({ hasReadArticle: !!hasReadArticle })
-
     this.refreshPayStatus()
   },
 
@@ -88,7 +87,6 @@ Page({
         url: "/pay/createOrder",
         method: "POST",
         data: {
-          userId,
           articleId,
           payPrice,
           parentShareUid: shareUid
@@ -123,7 +121,6 @@ Page({
             url: "/pay/createOrder",
             method: "POST",
             data: {
-              userId,
               articleId,
               payPrice,
               parentShareUid: shareUid

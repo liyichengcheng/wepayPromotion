@@ -239,6 +239,131 @@
   display: none;
 }
 
+.withdraw-btn {
+  display: inline-block;
+  background: linear-gradient(135deg, #07c160, #0ad870);
+  color: #ffffff;
+  padding: 10rpx 32rpx;
+  border-radius: 40rpx;
+  font-size: 24rpx;
+  font-weight: 500;
+  margin-top: 12rpx;
+  box-shadow: 0 4rpx 12rpx rgba(7, 193, 96, 0.3);
+}
+
+/* 提现弹窗 */
+.modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+.withdraw-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 560rpx;
+  background: #ffffff;
+  border-radius: 24rpx;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.withdraw-modal-header {
+  padding: 40rpx 32rpx 24rpx;
+  text-align: center;
+}
+
+.withdraw-modal-title {
+  font-size: 34rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.withdraw-modal-body {
+  padding: 16rpx 32rpx 40rpx;
+}
+
+.withdraw-modal-notice {
+  padding: 20rpx 24rpx;
+  background: rgba(249, 115, 22, 0.08);
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  color: #f97316;
+  line-height: 1.6;
+  margin-bottom: 32rpx;
+  text-align: center;
+}
+
+.withdraw-input-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.withdraw-input-label {
+  font-size: 28rpx;
+  color: #333;
+  margin-bottom: 16rpx;
+}
+
+.withdraw-input-wrapper {
+  display: flex;
+  align-items: center;
+  border: 2rpx solid #e0e0e0;
+  border-radius: 16rpx;
+  padding: 0 24rpx;
+  height: 88rpx;
+  background: #fafafa;
+}
+
+.withdraw-input-currency {
+  font-size: 36rpx;
+  color: #07c160;
+  font-weight: bold;
+  margin-right: 8rpx;
+}
+
+.withdraw-input {
+  flex: 1;
+  font-size: 36rpx;
+  color: #333;
+  font-weight: bold;
+}
+
+.withdraw-input-hint {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 12rpx;
+}
+
+.withdraw-modal-footer {
+  display: flex;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.withdraw-modal-cancel,
+.withdraw-modal-confirm {
+  flex: 1;
+  padding: 28rpx 0;
+  text-align: center;
+  font-size: 30rpx;
+}
+
+.withdraw-modal-cancel {
+  color: #666;
+  border-right: 1rpx solid #f0f0f0;
+}
+
+.withdraw-modal-confirm {
+  color: #07c160;
+  font-weight: bold;
+}
+
 .copy-link-btn {
   text-align: center;
   padding: 24rpx 0;
