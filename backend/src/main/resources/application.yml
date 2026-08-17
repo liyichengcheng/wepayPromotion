@@ -36,8 +36,18 @@ wx:
     notify-url: http://nj409uu6213.vicp.fun/api/pay/notify
     cert-path: D:/Users/clinton/Downloads/cert/apiclient_cert.p12
     transfer-desc: 文章分享佣金
-    # 开发环境Mock转账: 商户未开通「企业付款到零钱」(NO_AUTH) 时设为 true 模拟成功, 生产必须 false
-    mock-transfer: true
+    # 开发环境Mock转账: 商户未开通「商家转账到零钱」(V3) 时设为 true 模拟成功, 生产必须 false
+    mock-transfer: false
+    # ========= V3 商家转账到零钱必填配置 (开通产品后填充) =========
+    # APIv3 密钥 (32字节, 在商户平台"API安全"菜单设置, 与 V2 mch-key 是两个不同东西)
+    v3-key: ba700ff366edfce3dc628ddb8ebdd978
+    # 商户 API 私钥路径 (apiclient_key.pem, 请先转成 PKCS8:
+    #   openssl pkcs8 -topk8 -inform PEM -in apiclient_key.pem -out apiclient_key_pkcs8.pem -nocrypt)
+    private-key-path: D:/Users/clinton/Downloads/cert/apiclient_key_pkcs8.pem
+    # 商户 API 证书序列号 (在商户平台"API安全"页面, 或从 apiclient_cert.pem 读取)
+    merchant-serial: 16BE170CF772288B5570419BE96A88BAFF36F9BB
+    # 微信支付平台证书/公钥路径 wechatpay.pem (用于校验 V3 响应签名; 未配置时降级不校验)
+    platform-cert-path: D:/Users/clinton/Downloads/cert/apiclient_cert.pem
   share:
     aes-key: 2ShAYqaH/y1octey6WKr0w==
 

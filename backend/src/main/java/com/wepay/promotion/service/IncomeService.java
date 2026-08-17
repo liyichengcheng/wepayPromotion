@@ -32,9 +32,10 @@ public class IncomeService {
     private static final double COMMISSION_RATE = 0.3;
     private static final double COMMISSION_MIN = 2.0;
     private static final int MIN_WITHDRAW_FEN = 100;
+    private static final int MAX_WITHDRAW_FEN = 100000;
 
     /** 单笔提现超500元需人工审核 (500元 = 50000分) */
-    private static final int SINGLE_WITHDRAW_LIMIT_FEN = 50000;
+    private static final int SINGLE_WITHDRAW_LIMIT_FEN = 10000;
     /** 当日累计提现达1000元需人工审核 (1000元 = 100000分) */
     private static final long DAILY_WITHDRAW_LIMIT_FEN = 100000L;
 
@@ -120,6 +121,10 @@ public class IncomeService {
 //            throw new BusinessException("提现金额至少1元");
 //        } //todo
 
+        if (amountFen >= MIN_WITHDRAW_FEN) {
+            throw new BusinessException("单笔提现金额必须小于1000元");
+        }
+
         // 以 openid 为粒度加分布式锁, 防止并发提交提现请求
         String lockKey = String.format(WITHDRAW_LOCK_KEY, openid);
         Boolean locked = redis.opsForValue()
@@ -158,7 +163,7 @@ public class IncomeService {
             addWithdraw(openid, amountFen, 4);
 
             log.warn("提现需人工审核: openid={}, 金额={}分, 当日累计={}分, 原因={}", openid, amountFen, todayTotal,
-                    amountFen >= SINGLE_WITHDRAW_LIMIT_FEN ? "单笔超500元" : "当日累计超1000元");
+                    amountFen >= SINGLE_WITHDRAW_LIMIT_FEN ? "单笔超100元" : "当日累计超1000元");
             throw new BusinessException("提现金额较大, 已提交人工审核, 请等待管理员审批");
         }
         Withdraw withdraw = addWithdraw(openid, amountFen, 1);
