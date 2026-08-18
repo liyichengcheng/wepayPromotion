@@ -24,6 +24,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/user/wxLogin",
                         "/pay/notify",
+                        "/income/transferAuthNotify",  // 免确认授权结果回调 (微信调用, 无需登录)
                         "/article/getPayTotal",
                         "/admin/**",        // 静态管理界面
                         "/api/admin/**",     // 管理API(由AdminAuthInterceptor单独拦截)

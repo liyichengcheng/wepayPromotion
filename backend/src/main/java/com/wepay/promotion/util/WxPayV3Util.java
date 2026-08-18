@@ -21,6 +21,7 @@ import java.security.*;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -108,7 +109,7 @@ public class WxPayV3Util {
         }
     }
 
-    /** 从平台证书 wechatpay.pem 加载公钥 */
+    /** 从平台证书 wechatpay.pem 加载公钥 (兼容灰度切换期, 已完成公钥切换后可不用) */
     public static PublicKey loadPlatformPublicKey(String certPemPath) throws Exception {
         String content = readPemContent(certPemPath);
         String b64 = stripPem(content, "CERTIFICATE");
@@ -116,6 +117,18 @@ public class WxPayV3Util {
         CertificateFactory cf = CertificateFactory.getInstance("X.509");
         X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(der));
         return cert.getPublicKey();
+    }
+
+    /**
+     * 从微信支付公钥文件 pub_key.pem 加载公钥 (推荐方式, 替代平台证书)
+     * PEM 格式: -----BEGIN PUBLIC KEY----- (X.509 SubjectPublicKeyInfo / PKCS8 编码)
+     */
+    public static PublicKey loadPublicKey(String pemPath) throws Exception {
+        String content = readPemContent(pemPath);
+        String b64 = stripPem(content, "PUBLIC KEY");
+        byte[] der = Base64.getMimeDecoder().decode(b64);
+        X509EncodedKeySpec spec = new X509EncodedKeySpec(der);
+        return KeyFactory.getInstance("RSA").generatePublic(spec);
     }
 
     /**
@@ -144,29 +157,33 @@ public class WxPayV3Util {
     /** 校验微信响应签名. 返回 true=校验通过; 若平台公钥缺失则返回 true (降级) */
     public static boolean verifyResponse(String timestamp, String nonce, String body,
                                          String base64Signature, PublicKey platformKey) {
-//        if (platformKey == null)//todo
+        if (platformKey == null)//todo
             return true;
-//        try {
-//            String message = timestamp + "\n" + nonce + "\n" + body + "\n";
-//            Signature sig = Signature.getInstance(SIGNATURE_ALGO);
-//            sig.initVerify(platformKey);
-//            sig.update(message.getBytes(StandardCharsets.UTF_8));
-//            return sig.verify(Base64.getDecoder().decode(base64Signature));
-//        } catch (Exception e) {
-//            log.error("微信响应签名校验失败, timestamp={}, nonce={}, body={},base64Signature={}",timestamp,nonce,body,base64Signature,e);
-//            return false;
-//        }
+        try {
+            String message = timestamp + "\n" + nonce + "\n" + body + "\n";
+            Signature sig = Signature.getInstance(SIGNATURE_ALGO);
+            sig.initVerify(platformKey);
+            sig.update(message.getBytes(StandardCharsets.UTF_8));
+            return sig.verify(Base64.getDecoder().decode(base64Signature));
+        } catch (Exception e) {
+            log.error("微信响应签名校验失败, timestamp={}, nonce={}, body={},base64Signature={}",timestamp,nonce,body,base64Signature,e);
+            return false;
+        }
     }
 
     /**
      * 发送 V3 JSON 请求并返回 JsonNode + 原始字符串
      *
+     * @param merchantSerial   商户 API 证书序列号, 用于 Authorization 头的 serial_no
+     * @param wechatpaySerial   请求头 Wechatpay-Serial 的值 (公钥ID PUB_KEY_ID_xxx 或平台证书序列号)
+     * @param verifyKeys        响应验签密钥集合: key=serial(公钥ID或平台证书序列号) value=PublicKey
      * @return 数组 [0]=原始 body 字符串, [1]=JsonNode (解析成功时, 失败为null)
      */
     public static Object[] executeJson(String method, String fullUrl, String pathAndQuery,
                                         String body, PrivateKey privateKey,
                                         String mchId, String merchantSerial,
-                                        PublicKey platformPublicKey,
+                                        String wechatpaySerial,
+                                        Map<String, PublicKey> verifyKeys,
                                         Map<String, String> extraHeaders) throws Exception {
         String auth = buildAuthorization(method, pathAndQuery, body == null ? "" : body,
                 mchId, merchantSerial, privateKey);
@@ -185,7 +202,11 @@ public class WxPayV3Util {
             }
             req.setHeader("Accept", "application/json");
             req.setHeader("Authorization", auth);
-            req.setHeader("Wechatpay-Serial", merchantSerial);
+            // 请求头 Wechatpay-Serial: 告诉微信用哪种密钥签名响应
+            // 公钥模式传 PUB_KEY_ID_xxx, 平台证书模式传平台证书序列号
+            if (wechatpaySerial != null && !wechatpaySerial.isEmpty()) {
+                req.setHeader("Wechatpay-Serial", wechatpaySerial);
+            }
             if (extraHeaders != null) {
                 for (Map.Entry<String, String> e : extraHeaders.entrySet()) {
                     req.setHeader(e.getKey(), e.getValue());
@@ -198,16 +219,26 @@ public class WxPayV3Util {
                 if (raw == null)
                     raw = "";
 
-                // 校验响应签名 (2xx 时强制校验; 非2xx也尝试校验)
+                // 校验响应签名: 按响应头 Wechatpay-Serial 选择对应公钥 (灰度期间公钥/平台证书并存)
                 String wpTimestamp = firstHeader(resp, "Wechatpay-Timestamp");
                 String wpNonce = firstHeader(resp, "Wechatpay-Nonce");
                 String wpSignature = firstHeader(resp, "Wechatpay-Signature");
                 String wpSerial = firstHeader(resp, "Wechatpay-Serial");
-                if (wpTimestamp != null && wpNonce != null && wpSignature != null && platformPublicKey != null) {
-                    boolean ok = verifyResponse(wpTimestamp, wpNonce, raw, wpSignature, platformPublicKey);
-                    if (!ok) {
-                        throw new RuntimeException("微信响应签名校验失败 wpSerial="+wpSerial+",status=" + status + ", body=" + raw);
+                if (wpTimestamp != null && wpNonce != null && wpSignature != null
+                        && verifyKeys != null && !verifyKeys.isEmpty()) {
+                    PublicKey verifyKey = wpSerial != null ? verifyKeys.get(wpSerial) : null;
+                    // 兜底: 响应未带 serial 或 serial 未命中, 且只有一把密钥时, 用唯一密钥
+                    if (verifyKey == null && verifyKeys.size() == 1) {
+                        verifyKey = verifyKeys.values().iterator().next();
                     }
+                    if (verifyKey != null) {
+                        boolean ok = verifyResponse(wpTimestamp, wpNonce, raw, wpSignature, verifyKey);
+                        if (!ok) {
+                            throw new RuntimeException("微信响应签名校验失败 wpSerial=" + wpSerial
+                                    + ",status=" + status + ", body=" + raw);
+                        }
+                    }
+                    // verifyKey == null 且有多把密钥: 跳过验签 (降级), 由上层日志告警
                 }
 
                 JsonNode node = null;
@@ -303,6 +334,70 @@ public class WxPayV3Util {
             return OM.writeValueAsString(obj);
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 解密微信支付 V3 异步通知的 resource 密文 (AEAD_AES_256_GCM)
+     * <p>
+     * 用于免确认收款授权结果通知、商家转账结果通知等异步回调。
+     * <p>
+     * 参考文档:
+     * - https://pay.weixin.qq.com/doc/v3/merchant/4014512908 (免确认收款授权结果通知)
+     * - https://pay.weixin.qq.com/doc/v3/merchant/4012365342 (签名与验签)
+     * @param apiV3Key       APIv3 密钥 (32 字节字符串)
+     * @param associatedData 附加数据 (resource.associated_data, 可为 null)
+     * @param nonce          随机串 (resource.nonce, 12 字节)
+     * @param ciphertext     Base64 编码的密文 (resource.ciphertext, 末尾 16 字节为 GCM tag)
+     * @return 解密后的明文字符串 (UTF-8)
+     */
+    public static String decryptAesGcm(String apiV3Key, String associatedData, String nonce, String ciphertext) {
+        try {
+            byte[] keyBytes = apiV3Key.getBytes(StandardCharsets.UTF_8);
+            if (keyBytes.length != 32) {
+                throw new IllegalArgumentException("APIv3 密钥长度必须为 32 字节, 当前=" + keyBytes.length);
+            }
+            byte[] cipherBytes = Base64.getDecoder().decode(ciphertext);
+            byte[] nonceBytes = nonce.getBytes(StandardCharsets.UTF_8);
+            byte[] aadBytes = associatedData == null ? null : associatedData.getBytes(StandardCharsets.UTF_8);
+
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+            javax.crypto.spec.GCMParameterSpec spec = new javax.crypto.spec.GCMParameterSpec(128, nonceBytes);
+            javax.crypto.spec.SecretKeySpec keySpec = new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, keySpec, spec);
+            if (aadBytes != null && aadBytes.length > 0) {
+                cipher.updateAAD(aadBytes);
+            }
+            byte[] plainBytes = cipher.doFinal(cipherBytes);
+            return new String(plainBytes, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new RuntimeException("AES-GCM-256 解密失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 验证微信支付 V3 异步通知签名 (回调验签)
+     * <p>
+     * 验签串构造: wechatpayTimestamp\nwechatpayNonce\nbody\n
+     *
+     * @param verifyKey          验签公钥 (微信支付公钥或平台证书公钥)
+     * @param wechatpayTimestamp HTTP 头 Wechatpay-Timestamp
+     * @param wechatpayNonce     HTTP 头 Wechatpay-Nonce
+     * @param body               HTTP 请求 body 原文 (回调报文 JSON)
+     * @param wechatpaySignature HTTP 头 Wechatpay-Signature (Base64)
+     * @return true=验签通过; false=验签失败
+     */
+    public static boolean verifyNotifySignature(PublicKey verifyKey, String wechatpayTimestamp,
+                                                 String wechatpayNonce, String body, String wechatpaySignature) {
+        try {
+            String message = wechatpayTimestamp + "\n" + wechatpayNonce + "\n" + body + "\n";
+            java.security.Signature sig = java.security.Signature.getInstance(SIGNATURE_ALGO);
+            sig.initVerify(verifyKey);
+            sig.update(message.getBytes(StandardCharsets.UTF_8));
+            return sig.verify(Base64.getDecoder().decode(wechatpaySignature));
+        } catch (Exception e) {
+            log.warn("异步通知验签失败: {}", e.getMessage());
+            return false;
         }
     }
 

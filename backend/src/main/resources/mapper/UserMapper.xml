@@ -18,7 +18,7 @@
       逻辑表 t_user → 重写为 ds{N}.t_user_{M} 单个物理表
     -->
     <select id="selectByOpenid" resultType="com.wepay.promotion.entity.User">
-        SELECT id, openid, union_id, create_time, update_time
+        SELECT id, openid, union_id, out_authorization_no, authorization_id, create_time, update_time
         FROM t_user WHERE openid = #{openid}
     </select>
 
@@ -27,7 +27,32 @@
       逻辑表 t_user → 重写为 ds{N}.t_user_{M} 单个物理表
     -->
     <insert id="insert" parameterType="com.wepay.promotion.entity.User" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO t_user (openid, union_id)
-        VALUES (#{openid}, #{unionId})
+        INSERT INTO t_user (openid, union_id, out_authorization_no, authorization_id)
+        VALUES (#{openid}, #{unionId}, #{outAuthorizationNo}, #{authorizationId})
     </insert>
+
+    <!-- 更新商户侧授权单号 (申请授权成功后) -->
+    <update id="updateAuthorizationNo">
+        UPDATE t_user
+        SET out_authorization_no = #{outAuthorizationNo},
+            update_time = CURRENT_TIMESTAMP
+        WHERE openid = #{openid}
+    </update>
+
+    <!-- 更新微信授权单号 (用户确认授权后, 异步通知触发) -->
+    <update id="updateAuthorizationId">
+        UPDATE t_user
+        SET authorization_id = #{authorizationId},
+            update_time = CURRENT_TIMESTAMP
+        WHERE openid = #{openid}
+    </update>
+
+    <!-- 清除授权信息 (解除授权或授权被关闭) -->
+    <update id="clearAuthorization">
+        UPDATE t_user
+        SET out_authorization_no = NULL,
+            authorization_id = NULL,
+            update_time = CURRENT_TIMESTAMP
+        WHERE openid = #{openid}
+    </update>
 </mapper>

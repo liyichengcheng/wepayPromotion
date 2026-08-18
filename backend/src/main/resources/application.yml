@@ -46,7 +46,13 @@ wx:
     private-key-path: D:/Users/clinton/Downloads/cert/apiclient_key_pkcs8.pem
     # 商户 API 证书序列号 (在商户平台"API安全"页面, 或从 apiclient_cert.pem 读取)
     merchant-serial: 16BE170CF772288B5570419BE96A88BAFF36F9BB
-    # 微信支付平台证书/公钥路径 wechatpay.pem (用于校验 V3 响应签名; 未配置时降级不校验)
+    # ========= 微信支付公钥模式 (推荐, 替代平台证书) =========
+    # 在商户平台"账户中心-API安全-微信支付公钥"申请并下载 pub_key.pem + 公钥ID
+    # 公钥路径 (PEM 格式, 含 -----BEGIN PUBLIC KEY-----)
+    public-key-path: D:/Users/clinton/Downloads/cert/pub_key.pem
+    # 公钥 ID (形如 PUB_KEY_ID_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)
+    public-key-id: PUB_KEY_ID_0117491278602026080700111554000604
+    # 微信支付平台证书路径 wechatpay.pem (灰度切换期兼容, 已完成切换可置空)
     platform-cert-path: D:/Users/clinton/Downloads/cert/apiclient_cert.pem
   share:
     aes-key: 2ShAYqaH/y1octey6WKr0w==
