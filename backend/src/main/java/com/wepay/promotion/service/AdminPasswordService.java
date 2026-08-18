@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.DigestUtils;
 
 import javax.annotation.PostConstruct;
 import javax.crypto.Cipher;
@@ -22,8 +23,7 @@ import java.util.Base64;
 @Slf4j
 @Service
 public class AdminPasswordService {
-
-    private static final String REDIS_KEY = "admin:password";
+    private static final String REDIS_KEY = "admin:iefuhfu";
 
     private final StringRedisTemplate redis;
     private final String defaultPwd;
@@ -65,7 +65,7 @@ public class AdminPasswordService {
         return publicKeyPem;
     }
 
-    /** 获取当前有效的管理员密码: Redis 优先, 否则默认配置 */
+    /** 获取当前有效的管理员密码 MD5: Redis 优先, 否则默认配置的 MD5 */
     public String getEffectivePassword() {
         try {
             String pwd = redis.opsForValue().get(REDIS_KEY);
@@ -75,7 +75,7 @@ public class AdminPasswordService {
         } catch (Exception e) {
             log.warn("从Redis读取管理员密码失败, 回落到配置", e);
         }
-        return defaultPwd;
+        return md5(defaultPwd);
     }
 
     /**
@@ -84,15 +84,14 @@ public class AdminPasswordService {
      * @param encryptedNewPassword RSA加密后的新密码 (Base64)
      */
     public synchronized void changePassword(String oldPassword, String encryptedNewPassword) {
-        String current = getEffectivePassword();
-        if (!current.equals(oldPassword)) {
+        if (!verifyPassword(oldPassword)) {
             throw new BusinessException("原密码错误");
         }
         String newPwd = decryptPassword(encryptedNewPassword);
         if (newPwd == null || newPwd.length() < 6) {
             throw new BusinessException("新密码长度至少6位");
         }
-        redis.opsForValue().set(REDIS_KEY, newPwd);
+        redis.opsForValue().set(REDIS_KEY, md5(newPwd));
         log.info("管理员密码已更新");
     }
 
@@ -108,5 +107,17 @@ public class AdminPasswordService {
             log.error("RSA 解密失败", e);
             throw new BusinessException("密码解密失败, 请重试");
         }
+    }
+
+    /** 计算明文密码的 MD5 十六进制摘要 */
+    private String md5(String input) {
+        return DigestUtils.md5DigestAsHex((input == null ? "" : input).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * 校验明文密码是否正确 (对明文取 MD5 后与存储的 MD5 比对)
+     */
+    public boolean verifyPassword(String plainPwd) {
+        return getEffectivePassword().equals(md5(plainPwd));
     }
 }

@@ -152,8 +152,7 @@ function renderReviewButtons(item) {
 function renderQueryButtons(item) {
     let html = '';
     if ((item.status === 1 || item.status === 0) && item.transferNo) {
-        html += `<button class="btn-action btn-query" onclick="quickQueryTransfer('${item.transferNo}')">查状态</button>`;
-        html += `<button class="btn-action btn-retry" onclick="openRetry(${item.id}, '${item.openid}')">重试对账</button>`;
+        html += `<button class="btn-action btn-query" onclick="quickQueryTransfer(${item.id}, '${item.openid}')">查状态</button>`;
     }
     return html;
 }
@@ -161,8 +160,7 @@ function renderQueryButtons(item) {
 /** 转账状态追踪列表里每行的两个按钮 */
 function renderTraceButtons(item) {
     return `
-        <button class="btn-action btn-query" onclick="quickQueryAndShow(${item.id}, '${item.openid}', '${item.transferNo || ''}')">重查微信状态</button>
-        <button class="btn-action btn-retry" onclick="openReInitiate(${item.id}, '${item.openid}', ${item.amount}, '${item.transferNo || ''}')">重新发起提现</button>
+        <button class="btn-action btn-query" onclick="quickQueryAndShow(${item.id}, '${item.openid}')">重查微信状态</button>
     `;
 }
 
@@ -273,38 +271,28 @@ function doReject(id, openid) {
 }
 
 /* ========== 查询/重试 ========== */
-function quickQueryTransfer(transferNo) {
-    document.getElementById('queryTransferNo').value = transferNo;
+function quickQueryTransfer(withdrawId, openid) {
+    document.getElementById('queryOpenid').value = openid;
+    document.getElementById('queryWithdrawId').value = withdrawId;
     switchTab('query');
     queryTransfer();
 }
 
 function queryTransfer() {
-    const transferNo = document.getElementById('queryTransferNo').value.trim();
-    if (!transferNo) {
-        showToast('请输入转账单号', 'error');
+    const openid = document.getElementById('queryOpenid').value.trim();
+    const withdrawId = document.getElementById('queryWithdrawId').value.trim();
+    if (!openid || !withdrawId) {
+        showToast('请输入 openid 和提现单ID', 'error');
         return;
     }
-    showToast('查询中...', 'info');
-    api('/api/admin/withdraw/queryTransfer?transferNo=' + encodeURIComponent(transferNo))
+    showToast('查询中(含退避重试, 可能需数秒)...', 'info');
+    api('/api/admin/withdraw/queryTransfer?openid=' + encodeURIComponent(openid) + '&withdrawId=' + encodeURIComponent(withdrawId))
         .then(data => {
-            const res = (data && data.data) || data || {};
-            let jsonHtml = '';
-            if (typeof res === 'object') {
-                jsonHtml = `<div class="result-panel">${JSON.stringify(res, null, 2)}</div>`;
-            } else {
-                jsonHtml = `<div class="result-panel">${res}</div>`;
-            }
-            const status = res.transfer_status || res.result_code || '-';
-            const statusHtml = {
-                'SUCCESS': '<span class="status-tag status-2">SUCCESS 成功</span>',
-                'PROCESSING': '<span class="status-tag status-1">PROCESSING 处理中</span>',
-                'FAIL': '<span class="status-tag status-3">FAIL 失败</span>',
-                'NOTFOUND': '<span class="status-tag status-3">NOTFOUND 不存在</span>'
-            };
+            const res = (data && data.data) || data || '';
             document.getElementById('queryResult').innerHTML =
-                `<div style="margin-bottom:12px;">微信返回: ${statusHtml[status] || status}</div>` + jsonHtml;
-            showToast('查询完成', 'success');
+                `<div class="result-panel" style="color:#07c160;">✅ ${res || '查询完成'}</div>`;
+            showToast('查询完成, 列表已刷新', 'success');
+            loadProcessingList();
         }).catch(err => {
             document.getElementById('queryResult').innerHTML =
                 `<div class="empty" style="color:#b91c1c;padding:20px;">查询失败：${err.message}</div>`;
@@ -312,29 +300,17 @@ function queryTransfer() {
         });
 }
 
-/** 查询tab每行: 重查微信状态按钮 (显示到 queryResult面板 + 弹窗确认) */
-function quickQueryAndShow(id, openid, transferNo) {
-    if (!transferNo) {
-        showToast('该提现单暂无transferNo，请使用"重新发起提现"', 'error');
-        return;
-    }
-    showToast('查询中...', 'info');
-    // 调用 retry 接口: 根据transferNo查状态,并自动更新数据
-    api('/api/admin/withdraw/retry', { method: 'POST', body: { openid, withdrawId: id } })
+/** 查询tab每行: 重查微信状态按钮 (调用 queryTransfer 接口, 后端含退避重试并自动更新状态) */
+function quickQueryAndShow(withdrawId, openid) {
+    showToast('查询中(含退避重试, 可能需数秒)...', 'info');
+    api('/api/admin/withdraw/queryTransfer?openid=' + encodeURIComponent(openid) + '&withdrawId=' + encodeURIComponent(withdrawId))
         .then(data => {
-            const res = (data && data.data) || data || {};
-            const actions = {
-                'updated_to_success': '更新为【成功】',
-                'updated_to_failed': '更新为【失败】',
-                'still_processing': '仍在处理中',
-                'query_failed': '查询未成功'
-            };
-            openModal(`重查结果 - 提现单#${id}`,
+            const res = (data && data.data) || data || '';
+            openModal(`重查结果 - 提现单#${withdrawId}`,
                 `<div class="modal-info">
-                    <div class="modal-info-row"><span class="modal-info-label">执行动作</span><span class="modal-info-value" style="color:#07c160;font-weight:bold;">${actions[res.action] || res.action || '-'}</span></div>
+                    <div class="modal-info-row"><span class="modal-info-label">执行结果</span><span class="modal-info-value" style="color:#07c160;font-weight:bold;">${res || '查询完成'}</span></div>
                  </div>
-                 <div style="font-size:13px;color:#888;margin-bottom:8px;">微信返回明细:</div>
-                 <div class="result-panel">${JSON.stringify(res, null, 2)}</div>`,
+                 <div class="modal-notice" style="margin:0;">系统已根据微信返回状态自动更新提现单, 请关闭后查看最新状态。</div>`,
                 `<button class="modal-btn modal-btn-confirm" onclick="closeModal();loadProcessingList();if(currentTab==='pending')loadPendingList();if(currentTab==='all')loadAllList();">关闭并刷新</button>`
             );
         }).catch(err => {
@@ -464,7 +440,7 @@ function doChangePwd() {
         }
 
         // 3. 提交修改
-        return api('/admin/changePassword', {
+        return api('/api/admin/changePassword', {
             method: 'POST',
             body: {
                 oldPassword: oldPwd,

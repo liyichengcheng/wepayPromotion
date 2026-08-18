@@ -14,7 +14,6 @@ import javax.servlet.http.HttpServletResponse;
  */
 @Component
 public class AdminAuthInterceptor implements HandlerInterceptor {
-
     private final AdminPasswordService passwordService;
 
     public AdminAuthInterceptor(AdminPasswordService passwordService) {
@@ -38,8 +37,7 @@ public class AdminAuthInterceptor implements HandlerInterceptor {
         if (parts.length != 2) {
             throw new BusinessException(401, "认证信息格式错误");
         }
-        String effectivePwd = passwordService.getEffectivePassword();
-        if (!"admin".equals(parts[0]) || !effectivePwd.equals(parts[1])) {
+        if (!"admin".equals(parts[0]) || !passwordService.verifyPassword(parts[1])) {
             throw new BusinessException(403, "管理员密码错误");
         }
         return true;

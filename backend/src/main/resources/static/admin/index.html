@@ -82,11 +82,14 @@
                         </div>
                     </div>
 
-                    <div class="query-row" style="margin-bottom:20px;">
-                        <div class="form-group" style="flex:1;">
-                            <input class="form-input" type="text" id="queryTransferNo" placeholder="或单独输入商户转账单号 transferNo 查询">
+                    <div class="query-row" style="margin-bottom:20px;gap:10px;">
+                        <div class="form-group" style="flex:2;">
+                            <input class="form-input" type="text" id="queryOpenid" placeholder="用户 openid">
                         </div>
-                        <button class="btn-outline" onclick="queryTransfer()">单独查询微信状态</button>
+                        <div class="form-group" style="flex:1;">
+                            <input class="form-input" type="number" id="queryWithdrawId" placeholder="提现单ID">
+                        </div>
+                        <button class="btn-outline" onclick="queryTransfer()">查询并同步状态</button>
                     </div>
 
                     <div id="processingTable"></div>

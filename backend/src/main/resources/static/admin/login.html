@@ -52,7 +52,7 @@
                     'Authorization': 'Basic ' + creds
                 }
             }).then(res => {
-                if (res.ok) {
+                if (res.status === 200) {
                     localStorage.setItem('admin_auth', creds);
                     showToast('登录成功', 'success');
                     setTimeout(() => {
