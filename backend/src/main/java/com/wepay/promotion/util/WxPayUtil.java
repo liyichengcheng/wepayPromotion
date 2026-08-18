@@ -1,6 +1,7 @@
 package com.wepay.promotion.util;
 
 import com.wepay.promotion.dto.PayInfoVO;
+import org.apache.commons.lang3.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -32,7 +33,7 @@ public class WxPayUtil {
         for (Map.Entry<String, String> e : sorted.entrySet()) {
             String k = e.getKey();
             String v = e.getValue();
-            if (v == null || v.isEmpty() || "sign".equals(k)) {
+            if (StringUtils.isBlank(v) || "sign".equals(k)) {
                 continue;
             }
             sb.append(k).append("=").append(v).append("&");
@@ -100,7 +101,7 @@ public class WxPayUtil {
      */
     public static boolean verifySign(Map<String, String> params, String key) {
         String sign = params.get("sign");
-        if (sign == null || sign.isEmpty()) {
+        if (StringUtils.isBlank(sign)) {
             return false;
         }
         return sign.equalsIgnoreCase(sign(params, key));

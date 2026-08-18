@@ -1,6 +1,7 @@
 package com.wepay.promotion.interceptor;
 
 import com.wepay.promotion.common.BusinessException;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -23,7 +24,7 @@ public class AuthInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         String token = request.getHeader("token");
-        if (token == null || token.isEmpty()) {
+        if (StringUtils.isBlank(token)) {
             throw new BusinessException(401, "未登录");
         }
         String key = "token:" + token;

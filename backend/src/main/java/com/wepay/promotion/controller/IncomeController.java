@@ -16,7 +16,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/income")
 public class IncomeController {
-
     private final IncomeService incomeService;
 
     public IncomeController(IncomeService incomeService) {
@@ -70,7 +69,6 @@ public class IncomeController {
      * 解除免确认收款授权(需登录)
      * 调用微信解除授权接口, 清理本地状态
      * 解除后用户需重新申请授权才能走免确认转账
-     *
      * 参考文档: https://pay.weixin.qq.com/doc/v3/merchant/4015653811
      */
     @PostMapping("/terminateTransferAuth")

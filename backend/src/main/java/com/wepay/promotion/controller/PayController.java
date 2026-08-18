@@ -18,9 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/pay")
 public class PayController {
-
     private final PayService payService;
-
     public PayController(PayService payService) {
         this.payService = payService;
     }

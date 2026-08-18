@@ -8,6 +8,7 @@ import com.wepay.promotion.service.AdminPasswordService;
 import com.wepay.promotion.service.IncomeService;
 import com.wepay.promotion.service.WxPayService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -22,7 +23,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/admin")
 public class AdminController {
-
     private final WithdrawMapper withdrawMapper;
     private final IncomeService incomeService;
     private final WxPayService wxPayService;
@@ -82,18 +82,21 @@ public class AdminController {
 
     /** 手动查询微信转账状态 */
     @GetMapping("/withdraw/queryTransfer")
-    public Result<Map<String, String>> queryTransfer(@RequestParam String transferNo) {
+    public Result<String> queryTransfer(@RequestParam String openid,@RequestParam Long withdrawId) {
         try {
-            Map<String, String> resp = wxPayService.queryTransferStatus(transferNo);
-            return Result.success(resp);
+            Withdraw withdraw = withdrawMapper.selectById(openid,withdrawId);
+            String transferNo = withdraw.getTransferNo();
+            int amountFen = withdraw.getAmount();
+            incomeService.queryAndHandlerTransferWithBackoff(withdrawId,openid, transferNo, amountFen);
+            return Result.success("成功查询");
         } catch (Exception e) {
-            log.error("查询转账状态失败: transferNo={}", transferNo, e);
             throw new BusinessException("查询转账状态失败: " + e.getMessage());
         }
     }
 
     /** 手动重试: 根据 transferNo 查询微信状态并更新结果 */
     @PostMapping("/withdraw/retry")
+    @Deprecated
     public Result<Map<String, Object>> retry(@RequestBody Map<String, Object> body) {
         String openid = (String) body.get("openid");
         Long withdrawId = getLong(body, "withdrawId");
@@ -104,7 +107,7 @@ public class AdminController {
         if (withdraw == null) {
             throw new BusinessException("提现单不存在");
         }
-        if (withdraw.getTransferNo() == null || withdraw.getTransferNo().isEmpty()) {
+        if (StringUtils.isBlank(withdraw.getTransferNo())) {
             throw new BusinessException("该提现单没有transferNo, 无法查询状态");
         }
         Map<String, Object> result = new HashMap<>();
@@ -166,10 +169,10 @@ public class AdminController {
     public Result<Void> changePassword(@RequestBody Map<String, String> body) {
         String oldPassword = body.get("oldPassword");
         String encryptedNewPassword = body.get("encryptedNewPassword");
-        if (oldPassword == null || oldPassword.isEmpty()) {
+        if (StringUtils.isBlank(oldPassword)) {
             throw new BusinessException("请输入原密码");
         }
-        if (encryptedNewPassword == null || encryptedNewPassword.isEmpty()) {
+        if (StringUtils.isBlank(encryptedNewPassword)) {
             throw new BusinessException("请输入新密码");
         }
         adminPasswordService.changePassword(oldPassword, encryptedNewPassword);

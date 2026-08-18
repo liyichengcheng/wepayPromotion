@@ -8,6 +8,7 @@ import com.wepay.promotion.interceptor.AuthInterceptor;
 import com.wepay.promotion.mapper.UserMapper;
 import com.wepay.promotion.util.CryptoUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -41,11 +42,11 @@ public class UserService {
      *   库: ds{N}, 表: t_user_{M}, N,M = openid.hashCode() % 4
      */
     public WxLoginVO wxLogin(String code) {
-        if (code == null || code.isEmpty()) {
+        if (StringUtils.isBlank(code)) {
             throw new BusinessException("code不能为空");
         }
         String openid = wxPayService.jsCode2Session(code);
-        if (openid == null || openid.isEmpty()) {
+        if (StringUtils.isBlank(openid)) {
             throw new BusinessException("微信登录失败，未获取到openid");
         }
 
@@ -84,7 +85,7 @@ public class UserService {
      * 解密分享链接中的shareUid, 还原为openid
      */
     public String decryptShareUid(String shareUid) {
-        if (shareUid == null || shareUid.isEmpty()) {
+        if (StringUtils.isBlank(shareUid)) {
             return null;
         }
         try {

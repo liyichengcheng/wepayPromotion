@@ -8,7 +8,7 @@ import com.wepay.promotion.util.HttpClientUtil;
 import com.wepay.promotion.util.WxPayUtil;
 import com.wepay.promotion.util.WxPayV3Util;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -83,14 +83,14 @@ public class WxPayService {
     public void initV3Keys() {
         try {
             String pkPath = wxConfig.getPay().getPrivateKeyPath();
-            if (pkPath != null && !pkPath.isEmpty()) {
+            if (StringUtils.isNotBlank(pkPath)) {
                 merchantPrivateKey = WxPayV3Util.loadPrivateKey(pkPath);
                 log.info("WxPayV3: 商户私钥加载成功 {}", pkPath);
             }
             // 优先加载微信支付公钥 (推荐模式)
             String pubPath = wxConfig.getPay().getPublicKeyPath();
             String pubKeyId = wxConfig.getPay().getPublicKeyId();
-            if (pubPath != null && !pubPath.isEmpty() && pubKeyId != null && !pubKeyId.isEmpty()) {
+            if (StringUtils.isNotBlank(pubPath) && StringUtils.isNotBlank(pubKeyId)) {
                 wechatpayPublicKey = WxPayV3Util.loadPublicKey(pubPath);
                 wechatpayPublicKeyId = pubKeyId;
                 verifyKeyMap.put(pubKeyId, wechatpayPublicKey);
@@ -100,7 +100,7 @@ public class WxPayService {
             }
             // 兼容灰度切换期: 同时加载平台证书 (可选)
             String platPath = wxConfig.getPay().getPlatformCertPath();
-            if (platPath != null && !platPath.isEmpty()) {
+            if (StringUtils.isNotBlank(platPath)) {
                 try {
                     platformCertPublicKey = WxPayV3Util.loadPlatformPublicKey(platPath);
                     // 从证书文件读取序列号, 用于验签时按响应头 Wechatpay-Serial 匹配
@@ -369,7 +369,6 @@ public class WxPayService {
     }
 
     // ========== 私有工具方法 ==========
-
     /**
      * 发起免确认收款授权 (V3)
      * 接口: POST /v3/fund-app/mch-transfer/user-confirm-authorization
@@ -388,9 +387,7 @@ public class WxPayService {
         body.put("user_display_name", "用户" + openid.substring(Math.max(0, openid.length() - 6)));
         body.put("user_recv_perception", "劳务报酬");
         // 授权回调地址: 必须为 HTTPS (微信 V3 校验)
-        String authNotifyUrl = wxConfig.getPay().getNotifyUrl()
-                .replace("/pay/notify", "/income/transferAuthNotify")
-                .replaceFirst("^http://", "https://");
+        String authNotifyUrl = wxConfig.getPay().getTransferAuthNotifyUrl();
         body.put("authorization_notify_url", authNotifyUrl);
 
         String bodyStr = WxPayV3Util.toJson(body);
@@ -403,8 +400,7 @@ public class WxPayService {
                     wxConfig.getPay().getMerchantSerial(), getWechatpaySerial(), verifyKeyMap, null);
             node = (JsonNode) r[1];
         } catch (WxPayV3Util.V3ApiException ex) {
-            log.error("V3 发起免确认授权失败 status={}, code={}, message={}, raw={}",
-                    ex.getStatus(), ex.getCode(), ex.getWpMessage(), ex.getRawBody());
+            log.error("V3 发起免确认授权失败 status={}, code={}, message={}, raw={}", ex.getStatus(), ex.getCode(), ex.getWpMessage(), ex.getRawBody());
             Map<String, String> fail = new HashMap<>();
             fail.put("return_code", "FAIL");
             fail.put("err_code", ex.getCode() == null ? ("HTTP" + ex.getStatus()) : ex.getCode());
@@ -418,8 +414,9 @@ public class WxPayService {
         m.put("package_info", textOf(node, "package_info"));
         m.put("authorization_id", textOf(node, "authorization_id"));
         m.put("out_authorization_no", outAuthorizationNo);
-        log.info("V3 发起免确认授权成功: openid={}, state={}, authorizationId={}",
-                openid, m.get("authorization_state"), m.get("authorization_id"));
+
+        log.info("V3 发起免确认授权成功: openid={}, state={}, authorizationId={}", openid, m.get("authorization_state"), m.get("authorization_id"));
+
         return m;
     }
 
@@ -430,7 +427,6 @@ public class WxPayService {
      * <p>
      * ⚠️ 该接口【不接受 openid 参数】! 因为用户已通过 authorization_id 完成免确认授权,
      * 微信通过 authorization_id / out_authorization_no 即可定位收款方 openid.
-     * 若传入 openid, 微信会返回: PARAM_ERROR: 不支持传入openid参数, 请检查
      * <p>
      * ⚠️ authorization_id 与 out_authorization_no 【二选一必填, 不能同时传入】!
      * 若同时传入, 微信会返回: 微信免确认收款授权单号和商户授权单号不支持同时传入
@@ -451,8 +447,8 @@ public class WxPayService {
     public Map<String, String> transferByAuth(String partnerTradeNo, String openid, int amount, String desc,
                                                String authorizationId, String outAuthorizationNo) throws Exception {
         // 二选一必填校验: 至少有一个, 且只传一个到请求体
-        boolean hasAuthId = authorizationId != null && !authorizationId.isEmpty();
-        boolean hasOutAuthNo = outAuthorizationNo != null && !outAuthorizationNo.isEmpty();
+        boolean hasAuthId = StringUtils.isNotBlank(authorizationId);
+        boolean hasOutAuthNo = StringUtils.isNotBlank(outAuthorizationNo);
         if (!hasAuthId && !hasOutAuthNo) {
             throw new IllegalArgumentException("authorizationId 和 outAuthorizationNo 至少传一个, 用户未完成免确认授权");
         }
@@ -461,11 +457,9 @@ public class WxPayService {
         body.put("appid", wxConfig.getMiniapp().getAppid());
         body.put("out_bill_no", partnerTradeNo);
         body.put("transfer_scene_id", TRANSFER_SCENE_ID);
-        // ⚠️ 不要传 openid! 免确认转账接口通过 authorization_id / out_authorization_no 定位收款方
         body.put("transfer_amount", amount);
         body.put("transfer_remark", desc == null ? "分享佣金提现" : desc);
         body.put("user_recv_perception", "劳务报酬");
-        // ⚠️ authorization_id 和 out_authorization_no 二选一, 不能同时传! 优先 authorization_id
         if (hasAuthId) {
             body.put("authorization_id", authorizationId);
         } else {
@@ -481,7 +475,7 @@ public class WxPayService {
         info2.put("info_content", "文章分享佣金提现");
 
         String bodyStr = WxPayV3Util.toJson(body);
-        log.info("V3 免确认转账入参: out_bill_no={}, openid(仅日志)={}, amount={}, 使用字段={}",
+        log.info("V3 免确认转账入参: out_bill_no={}, openid{}, amount={}, 使用字段={}",
                 partnerTradeNo, openid, amount, hasAuthId ? "authorization_id=" + authorizationId : "out_authorization_no=" + outAuthorizationNo);
 
         // Mock 兜底
@@ -518,13 +512,12 @@ public class WxPayService {
      * 参考文档: https://pay.weixin.qq.com/doc/v3/merchant/4015653811
      * <p>
      * 解除后授权状态变为 CLOSED, 微信会再次回调 authorization_notify_url (event_type=MCHTRANSFER.AUTHORIZATION.CLOSED)
-     *
      * @param outAuthorizationNo 商户侧授权单号 (与申请授权时一致)
      * @return Map: state, close_reason 等
      */
     public Map<String, String> terminateTransferAuthorization(String outAuthorizationNo) throws Exception {
         ensureV3Ready();
-        if (outAuthorizationNo == null || outAuthorizationNo.isEmpty()) {
+        if (StringUtils.isBlank(outAuthorizationNo)) {
             throw new IllegalArgumentException("outAuthorizationNo 不能为空");
         }
 
@@ -594,7 +587,7 @@ public class WxPayService {
         return platformCertSerial;
     }
 
-    private static boolean isEmpty(String s) { return s == null || s.isEmpty(); }
+    private static boolean isEmpty(String s) { return StringUtils.isBlank(s); }
     private static String textOf(JsonNode n, String field) {
         if (n == null || !n.has(field)) return null;
         JsonNode v = n.get(field);

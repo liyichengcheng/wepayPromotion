@@ -2,6 +2,7 @@ package com.wepay.promotion.service;
 
 import com.wepay.promotion.common.BusinessException;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -68,7 +69,7 @@ public class AdminPasswordService {
     public String getEffectivePassword() {
         try {
             String pwd = redis.opsForValue().get(REDIS_KEY);
-            if (pwd != null && !pwd.isEmpty()) {
+            if (StringUtils.isNotBlank(pwd)) {
                 return pwd;
             }
         } catch (Exception e) {

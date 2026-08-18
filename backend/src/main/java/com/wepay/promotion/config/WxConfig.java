@@ -23,6 +23,7 @@ public class WxConfig {
         private String mchId;
         private String mchKey;
         private String notifyUrl;
+        private String transferAuthNotifyUrl;
         private String certPath;
         private String transferDesc;
         /**

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
@@ -173,7 +174,6 @@ public class WxPayV3Util {
 
     /**
      * 发送 V3 JSON 请求并返回 JsonNode + 原始字符串
-     *
      * @param merchantSerial   商户 API 证书序列号, 用于 Authorization 头的 serial_no
      * @param wechatpaySerial   请求头 Wechatpay-Serial 的值 (公钥ID PUB_KEY_ID_xxx 或平台证书序列号)
      * @param verifyKeys        响应验签密钥集合: key=serial(公钥ID或平台证书序列号) value=PublicKey
@@ -192,7 +192,7 @@ public class WxPayV3Util {
             HttpRequestBase req;
             if ("POST".equalsIgnoreCase(method)) {
                 HttpPost post = new HttpPost(fullUrl);
-                if (body != null && !body.isEmpty()) {
+                if (StringUtils.isNotBlank(body)) {
                     post.setEntity(new StringEntity(body, StandardCharsets.UTF_8));
                 }
                 post.setHeader("Content-Type", "application/json; charset=UTF-8");
@@ -204,7 +204,7 @@ public class WxPayV3Util {
             req.setHeader("Authorization", auth);
             // 请求头 Wechatpay-Serial: 告诉微信用哪种密钥签名响应
             // 公钥模式传 PUB_KEY_ID_xxx, 平台证书模式传平台证书序列号
-            if (wechatpaySerial != null && !wechatpaySerial.isEmpty()) {
+            if (StringUtils.isNotBlank(wechatpaySerial)) {
                 req.setHeader("Wechatpay-Serial", wechatpaySerial);
             }
             if (extraHeaders != null) {
@@ -234,18 +234,15 @@ public class WxPayV3Util {
                     if (verifyKey != null) {
                         boolean ok = verifyResponse(wpTimestamp, wpNonce, raw, wpSignature, verifyKey);
                         if (!ok) {
-                            throw new RuntimeException("微信响应签名校验失败 wpSerial=" + wpSerial
-                                    + ",status=" + status + ", body=" + raw);
+                            throw new RuntimeException("微信响应签名校验失败 wpSerial=" + wpSerial + ",status=" + status + ", body=" + raw);
                         }
                     }
-                    // verifyKey == null 且有多把密钥: 跳过验签 (降级), 由上层日志告警
                 }
 
                 JsonNode node = null;
                 try {
                     if (!raw.isEmpty()) node = OM.readTree(raw);
                 } catch (Exception ignore) {
-                    // not json
                 }
 
                 // 非 2xx 视为错误, 但把 body 和 code 带出去让上层适配

@@ -12,7 +12,7 @@ import com.wepay.promotion.mapper.UserMapper;
 import com.wepay.promotion.mapper.WithdrawMapper;
 import com.wepay.promotion.util.WxPayV3Util;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.InetAddress;
-import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -33,11 +32,11 @@ public class IncomeService {
     private static final int MAX_PRICE = 20;
     private static final double COMMISSION_RATE = 0.3;
     private static final double COMMISSION_MIN = 2.0;
-    private static final int MIN_WITHDRAW_FEN = 100000;
+    private static final int MIN_WITHDRAW_FEN = 10;//todo，改为100
     private static final int MAX_WITHDRAW_FEN = 100000;
 
     /** 单笔提现超500元需人工审核 (500元 = 50000分) */
-    private static final int SINGLE_WITHDRAW_LIMIT_FEN = 10000;
+    private static final int SINGLE_WITHDRAW_LIMIT_FEN = 50000;
     /** 当日累计提现达1000元需人工审核 (1000元 = 100000分) */
     private static final long DAILY_WITHDRAW_LIMIT_FEN = 100000L;
 
@@ -65,6 +64,10 @@ public class IncomeService {
     private static final String TRANSFER_AUTH_INFO_KEY = "transfer:auth:info:%s";
     /** 授权 package_info 缓存 key: value = package_info (24h 内可幂等返回前端) */
     private static final String TRANSFER_AUTH_PKG_KEY = "transfer:auth:pkg:%s";
+    /** 免确认授权申请分布式锁 key (openid 粒度), 防并发调用微信接口 */
+    private static final String TRANSFER_AUTH_LOCK_KEY = "transfer:auth:lock:%s";
+    /** 授权锁租约(秒), 覆盖一次微信 API 调用耗时 */
+    private static final long TRANSFER_AUTH_LOCK_LEASE_SECONDS = 30L;
 
     private final CommissionSummaryMapper commissionSummaryMapper;
     private final CommissionDetailMapper commissionDetailMapper;
@@ -127,11 +130,11 @@ public class IncomeService {
      * @param amountFen  提现金额(分)
      */
     public void applyWithdraw(String openid, Integer amountFen) {
-//        if (amountFen == null || amountFen < MIN_WITHDRAW_FEN) {
-//            throw new BusinessException("提现金额至少1元");
-//        } //todo
+        if (amountFen == null || amountFen < MIN_WITHDRAW_FEN) {
+            throw new BusinessException("提现金额至少1元");
+        }
 
-        if (amountFen >= MIN_WITHDRAW_FEN) {
+        if (amountFen > MAX_WITHDRAW_FEN) {
             throw new BusinessException("单笔提现金额必须小于1000元");
         }
 
@@ -173,11 +176,10 @@ public class IncomeService {
             addWithdraw(openid, amountFen, 4);
 
             log.warn("提现需人工审核: openid={}, 金额={}分, 当日累计={}分, 原因={}", openid, amountFen, todayTotal,
-                    amountFen >= SINGLE_WITHDRAW_LIMIT_FEN ? "单笔超100元" : "当日累计超1000元");
+                    amountFen >= SINGLE_WITHDRAW_LIMIT_FEN ? "单笔超500元" : "当日累计超1000元");
             throw new BusinessException("提现金额较大, 已提交人工审核, 请等待管理员审批");
         }
         Withdraw withdraw = addWithdraw(openid, amountFen, 1);
-
         executeTransfer(openid, withdraw, (int) amountFen);
     }
 
@@ -186,7 +188,7 @@ public class IncomeService {
         Withdraw withdraw = new Withdraw();
         withdraw.setOpenid(openid);
         withdraw.setAmount((int) availableFen);
-        withdraw.setStatus(status); // 处理中
+        withdraw.setStatus(status);
         // 4. 调用微信企业付款接口 (partner_trade_no 只能是字母或数字, 不能含下划线)
         String transferNo = "wd" + System.currentTimeMillis() + UUID.randomUUID().toString().substring(0, 6);
         withdraw.setTransferNo(transferNo);
@@ -222,8 +224,7 @@ public class IncomeService {
                 } else {
                     log.info("用户已授权免确认, 走免确认转账: openid={}, transferNo={}, authorizationId={}, outAuthorizationNo={}",
                             openid, transferNo, authorizationId, outAuthNo);
-                    resp = wxPayService.transferByAuth(transferNo, openid, amountFen, "分享佣金提现",
-                            authorizationId, outAuthNo);
+                    resp = wxPayService.transferByAuth(transferNo, openid, amountFen, "分享佣金提现", authorizationId, outAuthNo);
                 }
             } else {
                 resp = wxPayService.transfer(transferNo, openid, amountFen, "分享佣金提现", ip);
@@ -239,10 +240,8 @@ public class IncomeService {
                 handleTransferFailed(openid, withdrawId, transferNo, amountFen);
                 throw new BusinessException("提现失败: " + failReason);
             }
-        } catch (BusinessException e) {
-            log.error("",e);
-            throw e;
         } catch (Exception e) {
+            log.error("",e);
             if (apiCalled) {
                 // 接口有响应但处理异常
                 log.error("提现处理异常: openid={}, transferNo={}", openid, transferNo, e);
@@ -251,21 +250,25 @@ public class IncomeService {
             } else {
                 // 接口无响应: 阶梯延时查询
                 log.warn("转账接口无响应, 开始阶梯延时查询: openid={}, transferNo={}", openid, transferNo, e);
-                String queryResult = queryTransferWithBackoff(transferNo);
-
-                if ("SUCCESS".equals(queryResult)) {
-                    handleTransferSuccess(openid, withdrawId, transferNo, amountFen);
-                    log.info("延时查询确认转账成功: openid={}, transferNo={}", openid, transferNo);
-                } else if ("FAIL".equals(queryResult)) {
-                    handleTransferFailed(openid, withdrawId, transferNo, amountFen);
-                    throw new BusinessException("提现失败, 微信返回: FAIL");
-                } else {
-                    // 仍不确定: 标记为待人工处理
-                    log.error("阶梯延时查询仍无法确认转账状态: openid={}, transferNo={}", openid, transferNo);
-                    withdrawMapper.updateTransferNo(openid, withdrawId, transferNo, 1); // 保持处理中
-                    throw new BusinessException("转账接口无响应且查询超时, 已标记处理中, 请稍后或联系管理员");
-                }
+                queryAndHandlerTransferWithBackoff(withdrawId,openid, transferNo, amountFen);
             }
+        }
+    }
+
+    public void queryAndHandlerTransferWithBackoff(Long withdrawId,String openid, String transferNo,int amountFen)
+            throws BusinessException {
+        String queryResult = queryTransferWithBackoff(transferNo);
+        if ("SUCCESS".equals(queryResult)) {
+            handleTransferSuccess(openid, withdrawId, transferNo, amountFen);
+            log.info("延时查询确认转账成功: openid={}, transferNo={}", openid, transferNo);
+        } else if ("FAIL".equals(queryResult)) {
+            handleTransferFailed(openid, withdrawId, transferNo, amountFen);
+            throw new BusinessException("提现失败, 微信返回: FAIL");
+        } else {
+            // 仍不确定: 标记为待人工处理
+            log.error("阶梯延时查询仍无法确认转账状态: openid={}, transferNo={}", openid, transferNo);
+            withdrawMapper.updateTransferNo(openid, withdrawId, transferNo, 1); // 保持处理中
+            throw new BusinessException("转账接口无响应且查询超时, 已标记处理中, 请稍后或联系管理员");
         }
     }
 
@@ -364,7 +367,7 @@ public class IncomeService {
         int amount = withdraw.getAmount();
 
         // 步骤1: 如果已有transferNo, 先查微信状态
-        if (existingTransferNo != null && !existingTransferNo.isEmpty()) {
+        if (StringUtils.isNotBlank(existingTransferNo)) {
             try {
                 Map<String, String> queryResp = wxPayService.queryTransferStatus(existingTransferNo);
                 result.put("preQuery", queryResp);
@@ -441,12 +444,28 @@ public class IncomeService {
                         org.springframework.data.redis.connection.ReturnType.INTEGER, 1, keyBytes, valBytes);
             });
         } catch (Exception e) {
-            log.warn("释放提现锁失败 lockKey={}", lockKey, e);
+            log.warn("释放分布式锁失败 lockKey={}", lockKey, e);
         }
     }
 
-    // ==================== 免确认收款授权 ====================
+    /**
+     * 构造当前授权状态的返回结果 (并发锁竞争失败时使用)
+     */
+    private Map<String, Object> buildCurrentStateResult(String currentState, String openid) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        String state = StringUtils.isNotBlank(currentState) ? currentState : "NONE";
+        m.put("state", state);
+        if ("WAIT_USER_CONFIRM".equals(state)) {
+            m.put("message", "授权申请处理中, 请稍后再试");
+        } else if ("TAKING_EFFECT".equals(state)) {
+            m.put("message", "已授权免确认收款");
+        } else {
+            m.put("message", "授权申请处理中, 请稍后再试");
+        }
+        return m;
+    }
 
+    // ==================== 免确认收款授权 ====================
     /**
      * 申请免确认收款授权 (供小程序端调 wx.requestMerchantTransfer 拉起微信授权页)
      * <p>
@@ -460,99 +479,110 @@ public class IncomeService {
      * 幂等优化:
      * - TAKING_EFFECT: 直接返回, 不再申请
      * - WAIT_USER_CONFIRM 且 package_info 未过期: 直接返回缓存的 package_info, 不再调微信
-     *
      * @return Map: state, package_info, mchId, appId (前端拉起授权页需要)
      */
     public Map<String, Object> applyTransferAuth(String openid) {
-        String stateKey = String.format(TRANSFER_AUTH_STATE_KEY, openid);
-        String infoKey = String.format(TRANSFER_AUTH_INFO_KEY, openid);
-        String pkgKey = String.format(TRANSFER_AUTH_PKG_KEY, openid);
-
-        // 1. 已授权生效 (TAKING_EFFECT): 无需再申请
-        String currentState = redis.opsForValue().get(stateKey);
-        if ("TAKING_EFFECT".equals(currentState)) {
-            Map<String, Object> m = new java.util.LinkedHashMap<>();
-            m.put("state", "TAKING_EFFECT");
-            m.put("message", "已授权免确认收款, 无需重复申请");
-            return m;
-        }
-
-        // 2. WAIT_USER_CONFIRM 且 package_info 仍在 24h 有效期内: 直接返回缓存
-        if ("WAIT_USER_CONFIRM".equals(currentState)) {
-            String cachedPkg = redis.opsForValue().get(pkgKey);
-            String cachedInfo = redis.opsForValue().get(infoKey);
-            if (cachedPkg != null && !cachedPkg.isEmpty() && cachedInfo != null) {
-                String[] parts = cachedInfo.split("\\|");
-                Map<String, Object> m = new java.util.LinkedHashMap<>();
-                m.put("state", "WAIT_USER_CONFIRM");
-                m.put("package_info", cachedPkg);
-                m.put("mchId", wxPayService.getWxConfig().getPay().getMchId());
-                m.put("appId", wxPayService.getWxConfig().getMiniapp().getAppid());
-                m.put("outAuthorizationNo", parts[0]);
-                m.put("message", "请用 package_info 调 wx.requestMerchantTransfer 拉起微信授权页, 用户确认后状态会变为 TAKING_EFFECT");
-                return m;
-            }
-            // package_info 已过期, 走重新申请流程 (复用 outAuthorizationNo)
-        }
-
-        // 3. 首次申请或 package_info 过期: 调微信接口
-        String existingInfo = redis.opsForValue().get(infoKey);
-        String outAuthorizationNo;
-        if (existingInfo != null && !existingInfo.isEmpty()) {
-            // 复用已有 outAuthorizationNo (24h 内)
-            String[] parts = existingInfo.split("\\|");
-            outAuthorizationNo = parts[0];
-        } else {
-            outAuthorizationNo = "auth" + System.currentTimeMillis() + UUID.randomUUID().toString().substring(0, 6);
-        }
+        // 以 openid 为粒度加分布式锁, 防止并发调用微信接口
+        String authLockKey = String.format(TRANSFER_AUTH_LOCK_KEY, openid);
+        String authLockValue = UUID.randomUUID().toString();
 
         try {
-            Map<String, String> resp = wxPayService.applyTransferAuthorization(openid, outAuthorizationNo);
-            if (!"SUCCESS".equals(resp.get("return_code"))) {
-                throw new BusinessException("申请免确认授权失败: " + resp.get("err_code_des"));
+            Boolean authLocked = redis.opsForValue()
+                    .setIfAbsent(authLockKey, authLockValue, TRANSFER_AUTH_LOCK_LEASE_SECONDS, TimeUnit.SECONDS);
+            if (Boolean.FALSE.equals(authLocked)) {
+                log.info("用户[{}]授权申请正在处理中, 返回当前状态", openid);
+                return buildCurrentStateResult(null, openid);
             }
-            String state = resp.get("authorization_state");
-            String packageInfo = resp.get("package_info");
-            String authorizationId = resp.get("authorization_id");
 
-            // DB 持久化 outAuthorizationNo (确保 t_user 行存在并更新授权单号)
-            try {
-                User user = userMapper.selectByOpenid(openid);
-                if (user == null) {
-                    User newUser = new User();
-                    newUser.setOpenid(openid);
-                    newUser.setOutAuthorizationNo(outAuthorizationNo);
-                    userMapper.insert(newUser);
-                } else {
-                    userMapper.updateAuthorizationNo(openid, outAuthorizationNo);
+            String stateKey = String.format(TRANSFER_AUTH_STATE_KEY, openid);
+            String infoKey = String.format(TRANSFER_AUTH_INFO_KEY, openid);
+            String pkgKey = String.format(TRANSFER_AUTH_PKG_KEY, openid);
+
+            // 1. 已授权生效 (TAKING_EFFECT): 无需再申请
+            String currentState = redis.opsForValue().get(stateKey);
+            if ("TAKING_EFFECT".equals(currentState)) {
+                Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("state", "TAKING_EFFECT");
+                m.put("message", "已授权免确认收款, 无需重复申请");
+                return m;
+            }
+
+            // 2. WAIT_USER_CONFIRM 且 package_info 仍在 24h 有效期内: 直接返回缓存
+            if ("WAIT_USER_CONFIRM".equals(currentState)) {
+                String cachedPkg = redis.opsForValue().get(pkgKey);
+                String cachedInfo = redis.opsForValue().get(infoKey);
+                if (StringUtils.isNotBlank(cachedPkg) && cachedInfo != null) {
+                    String[] parts = cachedInfo.split("\\|");
+                    Map<String, Object> m = new java.util.LinkedHashMap<>();
+                    m.put("state", "WAIT_USER_CONFIRM");
+                    m.put("package_info", cachedPkg);
+                    m.put("mchId", wxPayService.getWxConfig().getPay().getMchId());
+                    m.put("appId", wxPayService.getWxConfig().getMiniapp().getAppid());
+                    m.put("outAuthorizationNo", parts[0]);
+                    m.put("message", "请用 package_info 调 wx.requestMerchantTransfer 拉起微信授权页, 用户确认后状态会变为 TAKING_EFFECT");
+                    return m;
                 }
-            } catch (Exception dbEx) {
-                log.warn("DB 更新 outAuthorizationNo 失败 (Redis 已缓存, 不影响流程): openid={}", openid, dbEx);
+                // package_info 已过期, 走重新申请流程 (复用 outAuthorizationNo)
             }
 
-            // 缓存 outAuthorizationNo + authorizationId (24h 有效, 与微信授权申请有效期一致)
-            redis.opsForValue().set(infoKey, outAuthorizationNo + "|" + (authorizationId == null ? "" : authorizationId),
-                    24, TimeUnit.HOURS);
-            // 缓存 package_info (24h 有效, 与授权申请有效期一致; 用于幂等返回)
-            if (packageInfo != null && !packageInfo.isEmpty()) {
-                redis.opsForValue().set(pkgKey, packageInfo, 24, TimeUnit.HOURS);
+           // 3. 首次申请或 package_info 过期: 调微信接口
+            String existingInfo = redis.opsForValue().get(infoKey);
+            String outAuthorizationNo;
+            if (StringUtils.isNotBlank(existingInfo)) {
+                // 复用已有 outAuthorizationNo (24h 内)
+                String[] parts = existingInfo.split("\\|");
+                outAuthorizationNo = parts[0];
+            } else {
+                outAuthorizationNo = "auth" + System.currentTimeMillis() + UUID.randomUUID().toString().substring(0, 6);
             }
-            // 更新状态
-            redis.opsForValue().set(stateKey,
-                    state == null ? "WAIT_USER_CONFIRM" : state, 30, TimeUnit.DAYS);
 
-            Map<String, Object> result = new java.util.LinkedHashMap<>();
-            result.put("state", state);
-            result.put("package_info", packageInfo);
-            result.put("mchId", wxPayService.getWxConfig().getPay().getMchId());
-            result.put("appId", wxPayService.getWxConfig().getMiniapp().getAppid());
-            result.put("outAuthorizationNo", outAuthorizationNo);
-            return result;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("申请免确认收款授权异常: openid={}", openid, e);
-            throw new BusinessException("申请免确认授权异常: " + e.getMessage());
+            try {
+                Map<String, String> resp = wxPayService.applyTransferAuthorization(openid, outAuthorizationNo);
+                if (!"SUCCESS".equals(resp.get("return_code"))) {
+                    throw new BusinessException("申请免确认授权失败: " + resp.get("err_code_des"));
+                }
+                String state = resp.get("authorization_state");
+                String packageInfo = resp.get("package_info");
+                String authorizationId = resp.get("authorization_id");
+
+                // DB 持久化 outAuthorizationNo (确保 t_user 行存在并更新授权单号)
+                try {
+                    User user = userMapper.selectByOpenid(openid);
+                    if (user == null) {
+                        User newUser = new User();
+                        newUser.setOpenid(openid);
+                        newUser.setOutAuthorizationNo(outAuthorizationNo);
+                        userMapper.insert(newUser);
+                    } else {
+                        userMapper.updateAuthorizationNo(openid, outAuthorizationNo);
+                    }
+                } catch (Exception dbEx) {
+                    log.warn("DB 更新 outAuthorizationNo 失败 (Redis 已缓存, 不影响流程): openid={}", openid, dbEx);
+                }
+
+                // 缓存 outAuthorizationNo + authorizationId (24h 有效, 与微信授权申请有效期一致)
+                redis.opsForValue().set(infoKey, outAuthorizationNo + "|" + (authorizationId == null ? "" : authorizationId),
+                        24, TimeUnit.HOURS);
+                // 缓存 package_info (24h 有效, 与授权申请有效期一致; 用于幂等返回)
+                if (StringUtils.isNotBlank(packageInfo)) {
+                    redis.opsForValue().set(pkgKey, packageInfo, 24, TimeUnit.HOURS);
+                }
+                // 更新状态
+                redis.opsForValue().set(stateKey, state == null ? "WAIT_USER_CONFIRM" : state, 30, TimeUnit.DAYS);
+
+                Map<String, Object> result = new java.util.LinkedHashMap<>();
+                result.put("state", state);
+                result.put("package_info", packageInfo);
+                result.put("mchId", wxPayService.getWxConfig().getPay().getMchId());
+                result.put("appId", wxPayService.getWxConfig().getMiniapp().getAppid());
+                result.put("outAuthorizationNo", outAuthorizationNo);
+                return result;
+            } catch (Exception e) {
+                log.error("申请免确认收款授权异常: openid={}", openid, e);
+                throw new BusinessException("申请免确认授权异常: " + e.getMessage());
+            }
+        } finally {
+            releaseLock(authLockKey, authLockValue);
         }
     }
 
@@ -705,16 +735,16 @@ public class IncomeService {
     private String getAuthorizationId(String openid) {
         // 1. 优先从 Redis 取
         String info = redis.opsForValue().get(String.format(TRANSFER_AUTH_INFO_KEY, openid));
-        if (info != null && !info.isEmpty()) {
+        if (StringUtils.isNotBlank(info)) {
             String[] parts = info.split("\\|");
-            if (parts.length >= 2 && parts[1] != null && !parts[1].isEmpty()) {
+            if (parts.length >= 2 && StringUtils.isNotBlank(parts[1])) {
                 return parts[1];
             }
         }
         // 2. 降级从 DB 取
         try {
             User user = userMapper.selectByOpenid(openid);
-            if (user != null && user.getAuthorizationId() != null && !user.getAuthorizationId().isEmpty()) {
+            if (user != null && StringUtils.isNotBlank(user.getAuthorizationId())) {
                 // 回填 Redis, 加速后续读取
                 String outAuthNo = user.getOutAuthorizationNo() == null ? "" : user.getOutAuthorizationNo();
                 redis.opsForValue().set(String.format(TRANSFER_AUTH_INFO_KEY, openid),
@@ -735,16 +765,16 @@ public class IncomeService {
     private String getOutAuthorizationNo(String openid) {
         // 1. 优先从 Redis 取
         String info = redis.opsForValue().get(String.format(TRANSFER_AUTH_INFO_KEY, openid));
-        if (info != null && !info.isEmpty()) {
+        if (StringUtils.isNotBlank(info)) {
             String[] parts = info.split("\\|");
-            if (parts.length >= 1 && parts[0] != null && !parts[0].isEmpty()) {
+            if (parts.length >= 1 && StringUtils.isNotBlank(parts[0])) {
                 return parts[0];
             }
         }
         // 2. 降级从 DB 取
         try {
             User user = userMapper.selectByOpenid(openid);
-            if (user != null && user.getOutAuthorizationNo() != null && !user.getOutAuthorizationNo().isEmpty()) {
+            if (user != null && StringUtils.isNotBlank(user.getOutAuthorizationNo())) {
                 // 回填 Redis
                 String authId = user.getAuthorizationId() == null ? "" : user.getAuthorizationId();
                 redis.opsForValue().set(String.format(TRANSFER_AUTH_INFO_KEY, openid),
@@ -761,18 +791,17 @@ public class IncomeService {
      * 用户主动解除免确认收款授权
      * 调用微信解除授权接口, 成功后清理本地状态 (Redis + DB)
      * 微信会异步回调 transferAuthNotify (event_type=MCHTRANSFER.AUTHORIZATION.CLOSED)
-     *
      * 参考文档: https://pay.weixin.qq.com/doc/v3/merchant/4015653811
      */
     public Map<String, Object> terminateTransferAuth(String openid) {
         // 1. 取本地 outAuthorizationNo (Redis 优先, DB 兜底)
         String outAuthorizationNo = null;
         String info = redis.opsForValue().get(String.format(TRANSFER_AUTH_INFO_KEY, openid));
-        if (info != null && !info.isEmpty()) {
+        if (StringUtils.isNotBlank(info)) {
             String[] parts = info.split("\\|");
             outAuthorizationNo = parts[0];
         }
-        if (outAuthorizationNo == null || outAuthorizationNo.isEmpty()) {
+        if (StringUtils.isBlank(outAuthorizationNo)) {
             try {
                 User user = userMapper.selectByOpenid(openid);
                 if (user != null) {
@@ -782,7 +811,7 @@ public class IncomeService {
                 log.warn("DB 查询 outAuthorizationNo 失败: openid={}", openid, e);
             }
         }
-        if (outAuthorizationNo == null || outAuthorizationNo.isEmpty()) {
+        if (StringUtils.isBlank(outAuthorizationNo)) {
             throw new BusinessException("未找到授权记录, 无需解除");
         }
 

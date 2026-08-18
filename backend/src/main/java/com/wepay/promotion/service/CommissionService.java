@@ -9,6 +9,7 @@ import com.wepay.promotion.mapper.CommissionSummaryMapper;
 import com.wepay.promotion.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +35,7 @@ public class CommissionService {
         String orderNo = order.getOrderNo();
         String parentShareUid = order.getParentShareUid();
 
-        if (parentShareUid == null || parentShareUid.isEmpty()) {
+        if (StringUtils.isBlank(parentShareUid)) {
             log.info("订单[{}]无分享者，跳过佣金处理", orderNo);
             return;
         }
