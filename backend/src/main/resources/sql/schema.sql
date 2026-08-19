@@ -75,6 +75,10 @@ CREATE TABLE t_user_0 (
     authorization_id    VARCHAR(32)  DEFAULT NULL COMMENT '用户确认授权后微信支付返回的授权单号',
     create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    name          VARCHAR(25)  COMMENT '真实姓名',
+    phone_no      VARCHAR(11)  COMMENT '手机号',
+    idcard_no     VARCHAR(18)  COMMENT '身份证号',
+    status      TINYINT  DEFAULT 0 COMMENT '0=未实名 1=已实名 -1=冻结提现',
     PRIMARY KEY (id),
     UNIQUE KEY uk_openid (openid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户分片表';
@@ -87,6 +91,10 @@ CREATE TABLE t_user_1 (
     authorization_id    VARCHAR(32)  DEFAULT NULL COMMENT '用户确认授权后微信支付返回的授权单号',
     create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    name          VARCHAR(25)  COMMENT '真实姓名',
+    phone_no      VARCHAR(11)  COMMENT '手机号',
+    idcard_no     VARCHAR(18)  COMMENT '身份证号',
+    status      TINYINT  DEFAULT 0 COMMENT '0=未实名 1=已实名 -1=冻结提现',
     PRIMARY KEY (id),
     UNIQUE KEY uk_openid (openid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户分片表';
@@ -99,6 +107,10 @@ CREATE TABLE t_user_2 (
     authorization_id    VARCHAR(32)  DEFAULT NULL COMMENT '用户确认授权后微信支付返回的授权单号',
     create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    name          VARCHAR(25)  COMMENT '真实姓名',
+    phone_no      VARCHAR(11)  COMMENT '手机号',
+    idcard_no     VARCHAR(18)  COMMENT '身份证号',
+    status      TINYINT  DEFAULT 0 COMMENT '0=未实名 1=已实名 -1=冻结提现',
     PRIMARY KEY (id),
     UNIQUE KEY uk_openid (openid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户分片表';
@@ -111,6 +123,10 @@ CREATE TABLE t_user_3 (
     authorization_id    VARCHAR(32)  DEFAULT NULL COMMENT '用户确认授权后微信支付返回的授权单号',
     create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    name          VARCHAR(25)  COMMENT '真实姓名',
+    phone_no      VARCHAR(11)  COMMENT '手机号',
+    idcard_no     VARCHAR(18)  COMMENT '身份证号',
+    status      TINYINT  DEFAULT 0 COMMENT '0=未实名 1=已实名 -1=冻结提现',
     PRIMARY KEY (id),
     UNIQUE KEY uk_openid (openid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户分片表';

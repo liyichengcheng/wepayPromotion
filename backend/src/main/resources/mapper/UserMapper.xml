@@ -18,13 +18,15 @@
       逻辑表 t_user → 重写为 ds{N}.t_user_{M} 单个物理表
     -->
     <select id="selectByOpenid" resultType="com.wepay.promotion.entity.User">
-        SELECT id, openid, union_id, out_authorization_no, authorization_id, create_time, update_time
+        SELECT id, openid, union_id, out_authorization_no, authorization_id,
+               name, phone_no, idcard_no, status, create_time, update_time
         FROM t_user WHERE openid = #{openid}
     </select>
 
     <!--
       精准路由: INSERT 带 openid (分片键), ShardingSphere 自动添加库/表后缀
       逻辑表 t_user → 重写为 ds{N}.t_user_{M} 单个物理表
+      新用户初始化: status 默认 0 (未实名), name/phone_no/idcard_no 不插入(由实名认证流程填充)
     -->
     <insert id="insert" parameterType="com.wepay.promotion.entity.User" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO t_user (openid, union_id, out_authorization_no, authorization_id)
@@ -52,6 +54,32 @@
         UPDATE t_user
         SET out_authorization_no = NULL,
             authorization_id = NULL,
+            update_time = CURRENT_TIMESTAMP
+        WHERE openid = #{openid}
+    </update>
+
+    <!--
+      更新实名认证信息 (实名认证通过后调用)
+      同时将 status 置为 1 (已实名)
+    -->
+    <update id="updateRealNameInfo">
+        UPDATE t_user
+        SET name = #{name},
+            phone_no = #{phoneNo},
+            idcard_no = #{idcardNo},
+            status = 0,
+            update_time = CURRENT_TIMESTAMP
+        WHERE openid = #{openid}
+    </update>
+
+    <!--
+      更新用户状态 (管理员冻结/解冻提现)
+      status: 1=已实名, -1=冻结提现
+      注意: 仅在已实名(status=1)状态下允许冻结; 冻结(status=-1)后允许解冻回 1
+    -->
+    <update id="updateStatus">
+        UPDATE t_user
+        SET status = #{status},
             update_time = CURRENT_TIMESTAMP
         WHERE openid = #{openid}
     </update>

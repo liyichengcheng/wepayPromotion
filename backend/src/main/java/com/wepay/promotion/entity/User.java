@@ -13,6 +13,14 @@ public class User {
     private String outAuthorizationNo;
     /** 用户确认授权后微信支付返回的授权单号 (用于 transferByAuth 接口必填参数) */
     private String authorizationId;
+    /** 真实姓名 (实名认证后填写) */
+    private String name;
+    /** 手机号 (实名认证后填写) */
+    private String phoneNo;
+    /** 身份证号 (实名认证后填写) */
+    private String idcardNo;
+    /** 用户状态: 0=未实名, 1=已实名, -1=冻结提现 */
+    private Integer status;
     private Date createTime;
     private Date updateTime;
 }

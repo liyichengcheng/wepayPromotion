@@ -32,4 +32,23 @@ public interface UserMapper {
      * @param openid 分片键
      */
     int clearAuthorization(@Param("openid") String openid);
+
+    /**
+     * 更新用户实名认证信息 (实名认证通过后调用, 同时将 status 置为 1 已实名)
+     * @param openid    分片键
+     * @param name      真实姓名
+     * @param phoneNo   手机号
+     * @param idcardNo  身份证号
+     */
+    int updateRealNameInfo(@Param("openid") String openid,
+                           @Param("name") String name,
+                           @Param("phoneNo") String phoneNo,
+                           @Param("idcardNo") String idcardNo);
+
+    /**
+     * 更新用户状态 (管理员冻结/解冻提现)
+     * @param openid  分片键
+     * @param status  目标状态: 1=已实名, -1=冻结提现
+     */
+    int updateStatus(@Param("openid") String openid, @Param("status") Integer status);
 }
