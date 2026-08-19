@@ -2,14 +2,19 @@ package com.wepay.promotion.controller;
 
 import com.wepay.promotion.common.BusinessException;
 import com.wepay.promotion.common.Result;
+import com.wepay.promotion.entity.User;
 import com.wepay.promotion.entity.Withdraw;
 import com.wepay.promotion.mapper.WithdrawMapper;
 import com.wepay.promotion.service.AdminPasswordService;
 import com.wepay.promotion.service.IncomeService;
+import com.wepay.promotion.service.RealNameService;
 import com.wepay.promotion.service.WxPayService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -33,17 +38,20 @@ public class AdminController {
     private final IncomeService incomeService;
     private final WxPayService wxPayService;
     private final AdminPasswordService adminPasswordService;
+    private final RealNameService realNameService;
     private final Executor adminExecutor;
 
     public AdminController(WithdrawMapper withdrawMapper,
                           IncomeService incomeService,
                           WxPayService wxPayService,
                           AdminPasswordService adminPasswordService,
+                          RealNameService realNameService,
                           @Qualifier("adminExecutor") Executor adminExecutor) {
         this.withdrawMapper = withdrawMapper;
         this.incomeService = incomeService;
         this.wxPayService = wxPayService;
         this.adminPasswordService = adminPasswordService;
+        this.realNameService = realNameService;
         this.adminExecutor = adminExecutor;
     }
 
@@ -211,6 +219,69 @@ public class AdminController {
         return CompletableFuture.supplyAsync(() -> {
             adminPasswordService.changePassword(oldPassword, finalEncryptedNewPassword);
             log.info("管理员密码已修改");
+            return Result.<Void>success();
+        }, adminExecutor);
+    }
+
+    /* ===================== 用户实名管理 ===================== */
+    /** 按手机号/身份证号/状态查询用户 */
+    @GetMapping("/user/search")
+    public CompletableFuture<Result<List<User>>> searchUsers(
+            @RequestParam(required = false) String phoneNo,
+            @RequestParam(required = false) String idcardNo,
+            @RequestParam(required = false) Integer status) {
+        return CompletableFuture.supplyAsync(() ->
+                Result.success(realNameService.searchUsers(phoneNo, idcardNo, status)), adminExecutor);
+    }
+
+    /** 获取身份证图片 (side=1正面, side=2背面) */
+    @GetMapping("/user/idcardImg")
+    public ResponseEntity<byte[]> getIdcardImg(@RequestParam String openid, @RequestParam int side) {
+        byte[] imgBytes = realNameService.loadIdcardImage(openid, side);
+        if (imgBytes == null) {
+            return ResponseEntity.notFound().build();
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.IMAGE_JPEG);
+        headers.setContentLength(imgBytes.length);
+        return new ResponseEntity<>(imgBytes, headers, 200);
+    }
+
+    /** 实名认证通过: status→1 */
+    @PostMapping("/user/approveRealName")
+    public CompletableFuture<Result<Void>> approveRealName(@RequestBody Map<String, String> body) {
+        String openid = body.get("openid");
+        if (StringUtils.isBlank(openid)) {
+            throw new BusinessException("openid不能为空");
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            realNameService.approveRealName(openid);
+            return Result.<Void>success();
+        }, adminExecutor);
+    }
+
+    /** 冻结提现: status→-1 */
+    @PostMapping("/user/freezeWithdraw")
+    public CompletableFuture<Result<Void>> freezeWithdraw(@RequestBody Map<String, String> body) {
+        String openid = body.get("openid");
+        if (StringUtils.isBlank(openid)) {
+            throw new BusinessException("openid不能为空");
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            realNameService.freezeWithdraw(openid);
+            return Result.<Void>success();
+        }, adminExecutor);
+    }
+
+    /** 解冻提现: status→0 */
+    @PostMapping("/user/unfreezeWithdraw")
+    public CompletableFuture<Result<Void>> unfreezeWithdraw(@RequestBody Map<String, String> body) {
+        String openid = body.get("openid");
+        if (StringUtils.isBlank(openid)) {
+            throw new BusinessException("openid不能为空");
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            realNameService.unfreezeWithdraw(openid);
             return Result.<Void>success();
         }, adminExecutor);
     }

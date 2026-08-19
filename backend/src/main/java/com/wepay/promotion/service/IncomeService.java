@@ -1,6 +1,7 @@
 package com.wepay.promotion.service;
 
 import com.wepay.promotion.common.BusinessException;
+import com.wepay.promotion.config.IdcardConfig;
 import com.wepay.promotion.dto.IncomeSummaryVO;
 import com.wepay.promotion.entity.CommissionDetail;
 import com.wepay.promotion.entity.CommissionSummary;
@@ -76,12 +77,14 @@ public class IncomeService {
     private final WxPayService wxPayService;
     private final ArticleService articleService;
     private final StringRedisTemplate redis;
+    private final IdcardConfig idcardConfig;
 
     public IncomeService(CommissionSummaryMapper commissionSummaryMapper,
                         CommissionDetailMapper commissionDetailMapper,
                         WithdrawMapper withdrawMapper,
                         UserMapper userMapper, WxPayService wxPayService,
-                        ArticleService articleService, StringRedisTemplate redis) {
+                        ArticleService articleService, StringRedisTemplate redis,
+                        IdcardConfig idcardConfig) {
         this.commissionSummaryMapper = commissionSummaryMapper;
         this.commissionDetailMapper = commissionDetailMapper;
         this.withdrawMapper = withdrawMapper;
@@ -89,6 +92,7 @@ public class IncomeService {
         this.wxPayService = wxPayService;
         this.articleService = articleService;
         this.redis = redis;
+        this.idcardConfig = idcardConfig;
     }
 
     public IncomeSummaryVO getUserIncome(String openid) {
@@ -160,6 +164,19 @@ public class IncomeService {
         }
         if (availableFen < amountFen) {
             return "可提现余额不足";
+        }
+        // 1.5 实名认证拦截: 本次提现后累计 ≥ 阈值 且未实名(status≠1) → 拒绝
+        int threshold = idcardConfig.getRealNameThresholdFen();
+        long withdrawnAmount = summary != null ? summary.getWithdrawnAmount() : 0;
+        if (withdrawnAmount + amountFen >= threshold
+                && !Integer.valueOf(1).equals(user.getStatus())) {
+            long thresholdYuan = threshold / 100;
+            return "累计提现金额已达" + thresholdYuan + "元，请先完成实名认证后再提现";
+        }
+        // 冻结拦截: status=-1
+        if (Integer.valueOf(-1).equals(user.getStatus())) {
+            String wechat = idcardConfig.getCustomerWechat();
+            return "您的提现功能已被冻结，请添加客服微信 " + wechat;
         }
         // 2. 风控检查: 单笔/当日累计阈值
         long todayTotal = withdrawMapper.sumTodayByUser(openid);

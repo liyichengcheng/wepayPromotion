@@ -71,6 +71,7 @@ function switchTab(tab) {
     if (tab === 'pending') loadPendingList();
     if (tab === 'all') loadAllList();
     if (tab === 'query') loadProcessingList();
+    if (tab === 'realname') loadUserList();
 }
 
 /* ========== 状态渲染 ========== */
@@ -382,6 +383,134 @@ function doReInitiate(id, openid) {
                  <div class="result-panel">${JSON.stringify(res, null, 2)}</div>`,
                 `<button class="modal-btn modal-btn-confirm" onclick="closeModal();loadProcessingList();if(currentTab==='pending')loadPendingList();if(currentTab==='all')loadAllList();">关闭并刷新</button>`
             );
+        }).catch(err => {
+            showToast(err.message, 'error');
+        });
+}
+
+/* ========== 用户实名管理 ========== */
+function userStatusText(status) {
+    const map = { 0: '未实名', 1: '已实名', '-1': '冻结提现' };
+    return map[status] !== undefined ? map[status] : ('状态' + status);
+}
+
+function searchUsers() {
+    loadUserList();
+}
+
+function loadUserList() {
+    const phoneNo = document.getElementById('searchPhoneNo').value.trim();
+    const idcardNo = document.getElementById('searchIdcardNo').value.trim();
+    const statusVal = document.getElementById('searchStatus').value;
+    const status = statusVal === '' ? null : statusVal;
+    const params = new URLSearchParams();
+    if (phoneNo) params.append('phoneNo', phoneNo);
+    if (idcardNo) params.append('idcardNo', idcardNo);
+    if (status !== null) params.append('status', status);
+
+    api('/api/admin/user/search?' + params.toString()).then(data => {
+        const list = (data && data.data) || data || [];
+        renderUserTable(list);
+    }).catch(err => {
+        document.getElementById('userTable').innerHTML =
+            `<div class="empty" style="color:#b91c1c;">查询失败：${err.message}</div>`;
+        showToast(err.message, 'error');
+    });
+}
+
+function renderUserTable(list) {
+    const box = document.getElementById('userTable');
+    if (!list || list.length === 0) {
+        box.innerHTML = `<div class="empty"><div class="empty-icon">📭</div>暂无数据</div>`;
+        return;
+    }
+    let html = `<div class="table-wrap"><table><thead><tr>
+        <th>ID</th>
+        <th>openid</th>
+        <th>姓名</th>
+        <th>手机号</th>
+        <th>身份证号</th>
+        <th>状态</th>
+        <th>身份证照片</th>
+        <th>操作</th>
+    </tr></thead><tbody>`;
+    for (const item of list) {
+        const openid = item.openid || '';
+        const hasIdcard = item.idcardNo ? true : false;
+        html += `<tr>
+            <td>${item.id || '-'}</td>
+            <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:12px;" title="${openid}">${openid ? openid.substring(0,16)+'...' : '-'}</td>
+            <td>${item.name || '-'}</td>
+            <td>${item.phoneNo || '-'}</td>
+            <td style="font-family:monospace;font-size:12px;">${item.idcardNo || '-'}</td>
+            <td><span class="status-tag status-${item.status}">${userStatusText(item.status)}</span></td>
+            <td>
+                ${hasIdcard ? `
+                    <button class="btn-action btn-query" onclick="showIdcardImage('${openid}',1)">正面</button>
+                    <button class="btn-action btn-query" onclick="showIdcardImage('${openid}',2)">背面</button>
+                ` : '-'}
+            </td>
+            <td>
+                <div class="btn-group">
+                    <button class="btn-action btn-approve" onclick="doApproveRealName('${openid}')">实名认证通过</button>
+                    <button class="btn-action btn-reject" onclick="doFreezeWithdraw('${openid}')">冻结提现</button>
+                    <button class="btn-action btn-query" onclick="doUnfreezeWithdraw('${openid}')">解冻提现</button>
+                </div>
+            </td>
+        </tr>`;
+    }
+    html += '</tbody></table></div>';
+    box.innerHTML = html;
+}
+
+function showIdcardImage(openid, side) {
+    const url = '/api/admin/user/idcardImg?openid=' + encodeURIComponent(openid) + '&side=' + side;
+    const authHeader = getAuthHeader();
+    // 用 fetch + Authorization 头加载图片 (后台图片接口需鉴权)
+    fetch(url, { headers: { 'Authorization': authHeader } })
+        .then(res => {
+            if (!res.ok) throw new Error('图片加载失败(' + res.status + ')');
+            return res.blob();
+        })
+        .then(blob => {
+            const imgUrl = URL.createObjectURL(blob);
+            openModal((side === 1 ? '身份证正面' : '身份证背面'),
+                `<div style="text-align:center;"><img src="${imgUrl}" style="max-width:100%;max-height:60vh;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);"></div>`,
+                `<button class="modal-btn modal-btn-confirm" onclick="closeModal()">关闭</button>`
+            );
+        }).catch(err => {
+            showToast(err.message, 'error');
+        });
+}
+
+function doApproveRealName(openid) {
+    if (!confirm('确认通过该用户的实名认证？')) return;
+    api('/api/admin/user/approveRealName', { method: 'POST', body: { openid: openid } })
+        .then(() => {
+            showToast('实名认证已通过', 'success');
+            loadUserList();
+        }).catch(err => {
+            showToast(err.message, 'error');
+        });
+}
+
+function doFreezeWithdraw(openid) {
+    if (!confirm('确认冻结该用户的提现功能？')) return;
+    api('/api/admin/user/freezeWithdraw', { method: 'POST', body: { openid: openid } })
+        .then(() => {
+            showToast('已冻结提现', 'success');
+            loadUserList();
+        }).catch(err => {
+            showToast(err.message, 'error');
+        });
+}
+
+function doUnfreezeWithdraw(openid) {
+    if (!confirm('确认解冻该用户的提现功能？(解冻后status变为0，用户需重新提交实名信息)')) return;
+    api('/api/admin/user/unfreezeWithdraw', { method: 'POST', body: { openid: openid } })
+        .then(() => {
+            showToast('已解冻提现', 'success');
+            loadUserList();
         }).catch(err => {
             showToast(err.message, 'error');
         });

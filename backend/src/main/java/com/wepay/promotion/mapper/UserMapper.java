@@ -3,6 +3,8 @@ package com.wepay.promotion.mapper;
 import com.wepay.promotion.entity.User;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 public interface UserMapper {
     /**
      * 按openid查询用户(分片键精准路由)
@@ -51,4 +53,15 @@ public interface UserMapper {
      * @param status  目标状态: 1=已实名, -1=冻结提现
      */
     int updateStatus(@Param("openid") String openid, @Param("status") Integer status);
+
+    /**
+     * 后台按条件查询用户 (不带分片键, ShardingSphere 自动广播查询所有分片)
+     * @param phoneNo   手机号 (可空)
+     * @param idcardNo  身份证号 (可空)
+     * @param status    用户状态 (可空)
+     * @return 匹配的用户列表
+     */
+    List<User> searchUsers(@Param("phoneNo") String phoneNo,
+                           @Param("idcardNo") String idcardNo,
+                           @Param("status") Integer status);
 }

@@ -59,15 +59,14 @@
     </update>
 
     <!--
-      更新实名认证信息 (实名认证通过后调用)
-      同时将 status 置为 1 (已实名)
+      更新实名认证信息 (用户提交实名信息时调用)
+      只更新 name/phone_no/idcard_no, status 保持不变 (由管理员审核后通过 updateStatus 修改)
     -->
     <update id="updateRealNameInfo">
         UPDATE t_user
         SET name = #{name},
             phone_no = #{phoneNo},
             idcard_no = #{idcardNo},
-            status = 0,
             update_time = CURRENT_TIMESTAMP
         WHERE openid = #{openid}
     </update>
@@ -83,4 +82,18 @@
             update_time = CURRENT_TIMESTAMP
         WHERE openid = #{openid}
     </update>
+
+    <!--
+      后台按条件查询用户 (不带分片键 openid, ShardingSphere 自动广播到所有分片)
+      参数均可空: 全部为空时返回最近100条
+    -->
+    <select id="searchUsers" resultType="com.wepay.promotion.entity.User">
+        SELECT id, openid, name, phone_no, idcard_no, status, create_time, update_time
+        FROM t_user
+        WHERE (#{phoneNo} IS NULL OR phone_no = #{phoneNo})
+          AND (#{idcardNo} IS NULL OR idcard_no = #{idcardNo})
+          AND (#{status} IS NULL OR status = #{status})
+        ORDER BY update_time DESC
+        LIMIT 100
+    </select>
 </mapper>
