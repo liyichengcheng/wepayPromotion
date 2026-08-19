@@ -262,23 +262,97 @@ public class IncomeService {
     public String queryAndHandlerTransferWithBackoff(Long withdrawId,String openid,
                                                      String transferNo,int amountFen,boolean retry)
             throws BusinessException {
+        log.info("[提现状态追踪] 开始阶梯查询: withdrawId={}, openid={}, transferNo={}, amountFen={}, retry={}",
+                withdrawId, openid, transferNo, amountFen, retry);
+
         String queryResult = queryTransferWithBackoff(transferNo);
+        log.info("[提现状态追踪] 阶梯查询完成: transferNo={}, queryResult={}", transferNo, queryResult);
+
         if ("SUCCESS".equals(queryResult)) {
+            log.info("[提现状态追踪] 查询结果=SUCCESS, 更新状态为成功: openid={}, transferNo={}", openid, transferNo);
             handleTransferSuccess(openid, withdrawId, transferNo, amountFen);
-            log.info("延时查询确认转账成功: openid={}, transferNo={}", openid, transferNo);
+            log.info("[提现状态追踪] 处理完成: openid={}, transferNo={}, 最终状态=提现成功", openid, transferNo);
             return "提现成功";
         } else if ("FAIL".equals(queryResult)) {
+            log.warn("[提现状态追踪] 查询结果=FAIL, 更新状态为失败: openid={}, transferNo={}", openid, transferNo);
             handleTransferFailed(openid, withdrawId, transferNo, amountFen);
+            log.info("[提现状态追踪] 处理完成: openid={}, transferNo={}, 最终状态=提现失败", openid, transferNo);
             return "提现失败";
         } else {
+            // 非终态 (ACCEPTED/PROCESSING/WAIT_USER_CONFIRM/TRANSFERING 等)
+            log.info("[提现状态追踪] 查询结果为非终态: openid={}, transferNo={}, state={}, retry={}",
+                    openid, transferNo, queryResult, retry);
+
             if (retry) {
                 if("ACCEPTED".equals(queryResult) || "PROCESSING".equals(queryResult)) {
-                    //todo 发起原单重试
+                    // 发起原单重试: 用相同 out_bill_no(transferNo) 重新调用转账接口
+                    // WeChat V3 规定: ACCEPTED(已受理可重试) / PROCESSING(资金锁定中, 可充值后重试) 均为非终态, 允许原单重试
+                    log.info("[提现状态追踪] 判定为可重试状态, 发起原单重试: openid={}, transferNo={}, 重试前状态={}",
+                            openid, transferNo, queryResult);
+                    try {
+                        String ip = getServerIp();
+                        boolean authFree = isTransferAuthEffective(openid);
+                        log.info("[提现状态追踪] 原单重试前置检查: openid={}, transferNo={}, authFree={}, ip={}",
+                                openid, transferNo, authFree, ip);
+
+                        Map<String, String> resp;
+                        if (authFree) {
+                            // 已授权免确认: 走 transferByAuth (直收到账)
+                            String authorizationId = getAuthorizationId(openid);
+                            String outAuthNo = getOutAuthorizationNo(openid);
+                            log.info("[提现状态追踪] 原单重试免确认模式: openid={}, authorizationId={}, outAuthorizationNo={}",
+                                    openid, authorizationId, outAuthNo);
+                            if (authorizationId == null && outAuthNo == null) {
+                                log.warn("[提现状态追踪] 授权状态异常(无 authorizationId/outAuthNo), 降级走用户确认模式: openid={}", openid);
+                                resp = wxPayService.transfer(transferNo, openid, amountFen, "分享佣金提现", ip);
+                            } else {
+                                resp = wxPayService.transferByAuth(transferNo, openid, amountFen, "分享佣金提现",
+                                        authorizationId, outAuthNo);
+                            }
+                        } else {
+                            // 未授权: 走用户确认模式
+                            log.info("[提现状态追踪] 原单重试用户确认模式: openid={}, transferNo={}", openid, transferNo);
+                            resp = wxPayService.transfer(transferNo, openid, amountFen, "分享佣金提现", ip);
+                        }
+
+                        log.info("[提现状态追踪] 原单重试微信返回: openid={}, transferNo={}, return_code={}, result_code={}, err_code={}, err_code_des={}",
+                                openid, transferNo,
+                                resp.get("return_code"), resp.get("result_code"),
+                                resp.get("err_code"), resp.get("err_code_des"));
+
+                        if ("SUCCESS".equals(resp.get("return_code")) && "SUCCESS".equals(resp.get("result_code"))) {
+                            log.info("[提现状态追踪] 原单重试成功: openid={}, transferNo={}, 更新状态为成功", openid, transferNo);
+                            handleTransferSuccess(openid, withdrawId, transferNo, amountFen);
+                            log.info("[提现状态追踪] 处理完成: openid={}, transferNo={}, 最终状态=提现成功", openid, transferNo);
+                            return "提现成功";
+                        } else if ("SUCCESS".equals(resp.get("return_code")) && "FAIL".equals(resp.get("result_code"))) {
+                            log.warn("[提现状态追踪] 原单重试失败: openid={}, transferNo={}, 原因={}, 更新状态为失败",
+                                    openid, transferNo, resp.get("err_code_des"));
+                            handleTransferFailed(openid, withdrawId, transferNo, amountFen);
+                            log.info("[提现状态追踪] 处理完成: openid={}, transferNo={}, 最终状态=提现失败", openid, transferNo);
+                            return "提现失败";
+                        } else {
+                            // 重试后仍非终态, 保持处理中
+                            log.warn("[提现状态追踪] 原单重试后仍非终态: openid={}, transferNo={}, 重试后状态={}, 保持处理中",
+                                    openid, transferNo, resp.get("result_code"));
+                            return "提现中";
+                        }
+                    } catch (Exception e) {
+                        log.error("[提现状态追踪] 原单重试异常: openid={}, transferNo={}, 异常类型={}, 异常信息={}",
+                                openid, transferNo, e.getClass().getSimpleName(), e.getMessage(), e);
+                        return "提现中";
+                    }
+                } else {
+                    log.info("[提现状态追踪] 当前状态[{}]不满足原单重试条件, 跳过重试: openid={}, transferNo={}",
+                            queryResult, openid, transferNo);
+                    return "提现中";
                 }
             }
-            // 仍不确定: 标记为待人工处理
-            log.error("阶梯延时查询仍无法确认转账状态: openid={}, transferNo={}", openid, transferNo);
+            // 仍不确定: 保持处理中
+            log.warn("[提现状态追踪] 阶梯查询+重试后仍非终态, 保持处理中: openid={}, transferNo={}, queryResult={}",
+                    openid, transferNo, queryResult);
             withdrawMapper.updateTransferNo(openid, withdrawId, transferNo, 1); // 保持处理中
+            log.info("[提现状态追踪] 处理完成: openid={}, transferNo={}, 最终状态=提现中(待进一步确认)", openid, transferNo);
             return "提现中";
         }
     }
