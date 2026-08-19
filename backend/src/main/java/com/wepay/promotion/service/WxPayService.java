@@ -256,7 +256,12 @@ public class WxPayService {
         String state = textOf(resp, "state");
         String transferBillNo = textOf(resp, "transfer_bill_no");
 
-        // SUCCESS: 直接视为成功
+        /**
+         * ACCEPTED:  转账已受理，可原单重试（非终态）。
+         * PROCESSING:  转账锁定资金中。如果一直停留在该状态，建议检查账户余额是否足够，如余额不足，可充值后再原单重试（非终态）。
+         * TRANSFERING:  转账中，可拉起微信收款确认页面再次重试确认收款（非终态）。
+         * SUCCESS:  转账成功，表示转账单据已成功（终态）。
+         *  */
         if ("SUCCESS".equalsIgnoreCase(state)) {
             Map<String, String> ok = new HashMap<>();
             ok.put("return_code", "SUCCESS");
@@ -269,13 +274,12 @@ public class WxPayService {
             return ok;
         }
 
-        // FAIL / CANCELLED 终态失败
         if (isTerminalFailure(state)) {
             String failReason = firstNonEmpty(textOf(resp, "fail_reason"), "V3 state=" + state);
             Map<String, String> fail = new HashMap<>();
             fail.put("return_code", "SUCCESS");
             fail.put("result_code", "FAIL");
-            fail.put("err_code", "V3_" + state);
+            fail.put("err_code", state);
             fail.put("err_code_des", failReason);
             return fail;
         }
@@ -285,9 +289,7 @@ public class WxPayService {
         log.info("V3 商家转账未到终态 out_bill_no={} state={}, 交给阶梯延时查询确认", partnerTradeNo, state);
         Map<String, String> processing = new HashMap<>();
         processing.put("return_code", "SUCCESS");
-        processing.put("result_code", "FAIL");
-        processing.put("err_code", "PROCESSING");
-        processing.put("err_code_des", "V3 state=" + state);
+        processing.put("result_code", state);
         return processing;
     }
 
@@ -298,8 +300,7 @@ public class WxPayService {
     /**
      * 查询商家转账状态 (V3 新版) - 供阶梯延时重试和管理员后台使用
      * 接口: GET /v3/fund-app/mch-transfer/transfer-bills/out-bill-no/{out_bill_no}
-     * 返回值做了 V2 风格适配, 上层 IncomeService 无需变动:
-     *   transfer_status = SUCCESS / PROCESSING / FAIL
+     * 返回值做了 V2 风格适配, 上层 IncomeService 无需变动: transfer_status = SUCCESS / PROCESSING / FAIL
      */
     public Map<String, String> queryTransferStatus(String partnerTradeNo) throws Exception {
         // 路径参数模式: /v3/fund-app/mch-transfer/transfer-bills/out-bill-no/{out_bill_no}
@@ -339,20 +340,24 @@ public class WxPayService {
             throw ex;
         }
 
+        /**
+         * ACCEPTED:  转账已受理，可原单重试（非终态）。
+         * PROCESSING:  转账锁定资金中。如果一直停留在该状态，建议检查账户余额是否足够，如余额不足，可充值后再原单重试（非终态）。
+         * WAIT_USER_CONFIRM:  待收款用户确认，当前转账单据资金已锁定，可拉起微信收款确认页面进行收款确认（非终态）。
+         * TRANSFERING:  转账中，可拉起微信收款确认页面再次重试确认收款（非终态）。
+         * SUCCESS:  转账成功，表示转账单据已成功（终态）。
+         * FAIL:  转账失败，表示该笔转账单据已失败。若需重新向用户转账，请重新生成单据并再次发起（终态）。
+         * CANCELING:  转账撤销中，商户撤销请求受理成功，该笔转账正在撤销中，需查单确认撤销的转账单据状态（非终态）。
+         * CANCELLED:  转账撤销完成，代表转账单据已撤销成功（终态）。
+         *  */
         // 新版 V3 响应字段: state, transfer_bill_no, fail_reason, update_time
         String state = textOf(node, "state");
         String transferBillNo = textOf(node, "transfer_bill_no");
         String failReason = textOf(node, "fail_reason");
 
         // 映射到老链路三态
-        String transferStatus;
-        if ("SUCCESS".equalsIgnoreCase(state)) {
-            transferStatus = "SUCCESS";
-        } else if (isTerminalFailure(state)) {
-            transferStatus = "FAIL";
-        } else {
-            // ACCEPTED / WAIT_USER_CONFIRM / PROCESSING / TRANSFERING / CANCELING -> PROCESSING
-            transferStatus = "PROCESSING";
+        if (isTerminalFailure(state)) {
+            state = "FAIL";
         }
 
         Map<String, String> m = new HashMap<>();
@@ -360,11 +365,10 @@ public class WxPayService {
         m.put("result_code", "SUCCESS");
         m.put("partner_trade_no", partnerTradeNo);
         m.put("state", state == null ? "" : state);
-        m.put("transfer_status", transferStatus);
+        m.put("transfer_status", state);
         if (failReason != null) m.put("fail_reason", failReason);
         m.put("payment_no", transferBillNo == null ? "" : transferBillNo);
-        log.debug("V3 查询转账状态 out_bill_no={} state={} -> transfer_status={}",
-                partnerTradeNo, state, transferStatus);
+        log.debug("V3 查询转账状态 out_bill_no={} state={} ", partnerTradeNo, state);
         return m;
     }
 

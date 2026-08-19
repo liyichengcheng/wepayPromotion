@@ -31,7 +31,7 @@
     <update id="incrementPendingAmount">
         UPDATE t_commission_summary
         SET pending_amount = pending_amount + #{amount}, update_time = NOW()
-        WHERE openid = #{openid}
+        WHERE openid = #{openid} AND total_amount - withdrawn_amount - pending_amount >= #{amount}
     </update>
 
     <!-- 提现成功: 减少提现中，增加已提现 -> 带分片键 openid, 精准路由 -->
@@ -40,7 +40,7 @@
         SET pending_amount = pending_amount - #{amount},
             withdrawn_amount = withdrawn_amount + #{amount},
             update_time = NOW()
-        WHERE openid = #{openid}
+        WHERE openid = #{openid};
     </update>
 
     <!-- 提现失败: 减少提现中 -> 带分片键 openid, 精准路由 -->

@@ -39,10 +39,10 @@ public class IncomeController {
      * 未授权用户: 走用户确认收款模式 (需在微信内点击确认)
      */
     @PostMapping("/applyWithdraw")
-    public Result<Void> applyWithdraw(@RequestBody ApplyWithdrawRequest req, HttpServletRequest request) {
+    public Result<String> applyWithdraw(@RequestBody ApplyWithdrawRequest req, HttpServletRequest request) {
         String openid = (String) request.getAttribute(AuthInterceptor.CURRENT_OPENID);
-        incomeService.applyWithdraw(openid, req.getAmount());
-        return Result.success();
+        String result = incomeService.applyWithdraw(openid, req.getAmount());
+        return Result.success(result);
     }
 
     /**

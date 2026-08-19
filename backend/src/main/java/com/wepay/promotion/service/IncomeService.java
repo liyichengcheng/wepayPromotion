@@ -129,26 +129,27 @@ public class IncomeService {
      * @param openid     用户openid
      * @param amountFen  提现金额(分)
      */
-    public void applyWithdraw(String openid, Integer amountFen) {
+    @Transactional(rollbackFor = Exception.class)
+    public String applyWithdraw(String openid, Integer amountFen) {
         if (amountFen == null || amountFen < MIN_WITHDRAW_FEN) {
-            throw new BusinessException("提现金额至少1元");
+            return "提现金额至少1元";
         }
 
         if (amountFen > MAX_WITHDRAW_FEN) {
-            throw new BusinessException("单笔提现金额必须小于1000元");
+            return "单笔提现金额必须小于1000元";
         }
 
         // 以 openid 为粒度加分布式锁, 防止并发提交提现请求
         String lockKey = String.format(WITHDRAW_LOCK_KEY, openid);
         Boolean locked = redis.opsForValue()
                 .setIfAbsent(lockKey, "1", WITHDRAW_RATE_LIMIT_HOURS, TimeUnit.HOURS);
-        if (Boolean.FALSE.equals(locked)) {
-            throw new BusinessException("每小时只能提现一次, 请稍后再试");
+        if (null == locked || Boolean.FALSE.equals(locked)) {
+            return "每小时只能提现一次, 请稍后再试";
         }
 
         User user = userMapper.selectByOpenid(openid);
         if (user == null || user.getOpenid() == null) {
-            throw new BusinessException("用户不存在或未绑定openid");
+            return "用户不存在";
         }
 
         // 1. 获取可提现余额
@@ -159,28 +160,27 @@ public class IncomeService {
                     summary.getTotalAmount() - summary.getWithdrawnAmount() - summary.getPendingAmount());
         }
         if (availableFen < amountFen) {
-            throw new BusinessException("可提现余额不足");
+            return "可提现余额不足";
         }
         // 2. 风控检查: 单笔/当日累计阈值
         long todayTotal = withdrawMapper.sumTodayByUser(openid);
         boolean needReview = amountFen >= SINGLE_WITHDRAW_LIMIT_FEN
                 || (todayTotal + amountFen) >= DAILY_WITHDRAW_LIMIT_FEN;
 
-        applyWithdrawInTransaction(needReview, openid, amountFen, todayTotal);
+        return applyWithdrawInTransaction(needReview, openid, amountFen, todayTotal);
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public void applyWithdrawInTransaction(boolean needReview, String openid, long amountFen, long todayTotal) {
+    public String applyWithdrawInTransaction(boolean needReview, String openid, long amountFen, long todayTotal) {
         if (needReview) {
             // 需审核: 创建提现单, 状态=4(待审核), 不调微信接口
             addWithdraw(openid, amountFen, 4);
 
             log.warn("提现需人工审核: openid={}, 金额={}分, 当日累计={}分, 原因={}", openid, amountFen, todayTotal,
                     amountFen >= SINGLE_WITHDRAW_LIMIT_FEN ? "单笔超500元" : "当日累计超1000元");
-            throw new BusinessException("提现金额较大, 已提交人工审核, 请等待管理员审批");
+            return "提现金额较大, 已提交人工审核, 请等待管理员审批";
         }
         Withdraw withdraw = addWithdraw(openid, amountFen, 1);
-        executeTransfer(openid, withdraw, (int) amountFen);
+        return executeTransfer(openid, withdraw, (int) amountFen);
     }
 
     private Withdraw addWithdraw(String openid,long availableFen,Integer status) {
@@ -194,7 +194,10 @@ public class IncomeService {
         withdraw.setTransferNo(transferNo);
         withdrawMapper.insert(withdraw);
         // 冻结佣金: 增加pendingAmount
-        commissionSummaryMapper.incrementPendingAmount(openid, (int) availableFen);
+        int result = commissionSummaryMapper.incrementPendingAmount(openid, (int) availableFen);
+        if (result < 1) {
+            throw new BusinessException("不能重复提现");
+        }
         return withdraw;
     }
 
@@ -204,9 +207,8 @@ public class IncomeService {
      * 已授权免确认用户走 transferByAuth (直接到账), 未授权走 transfer (用户确认模式)
      */
     @Transactional(rollbackFor = Exception.class)
-    public void executeTransfer(String openid, Withdraw withdraw, int amountFen) {
+    public String executeTransfer(String openid, Withdraw withdraw, int amountFen) {
         String ip = getServerIp();
-        boolean apiCalled = false;
 
         Long withdrawId = withdraw.getId();
         String transferNo = withdraw.getTransferNo();
@@ -229,46 +231,55 @@ public class IncomeService {
             } else {
                 resp = wxPayService.transfer(transferNo, openid, amountFen, "分享佣金提现", ip);
             }
-            apiCalled = true;
 
             if ("SUCCESS".equals(resp.get("return_code")) && "SUCCESS".equals(resp.get("result_code"))) {
                 handleTransferSuccess(openid, withdrawId, transferNo, amountFen);
                 log.info("提现成功: openid={}, 金额={}分, transferNo={}, paymentNo={}",
                         openid, amountFen, transferNo, resp.get("payment_no"));
-            } else {
-                String failReason = resp.get("err_code") + ":" + resp.get("err_code_des");
+                return "提现成功";
+            } else if ("SUCCESS".equals(resp.get("return_code")) && "FAIL".equals(resp.get("result_code"))) {
+                log.error("提现失败: transferNo={}, 原因={}", transferNo, resp.get("err_code_des"));
                 handleTransferFailed(openid, withdrawId, transferNo, amountFen);
-                throw new BusinessException("提现失败: " + failReason);
+                return "提现失败";
+            } else {
+                log.warn("转账接口返回的状态是={}, 开始阶梯延时查询: openid={}, transferNo={}",resp.get("err_code"),openid, transferNo);
+                new Thread(() -> {
+                    queryAndHandlerTransferWithBackoff(withdrawId,openid, transferNo, amountFen,false);
+                }).start();
+                return "提现中";
             }
         } catch (Exception e) {
-            log.error("",e);
-            if (apiCalled) {
-                // 接口有响应但处理异常
-                log.error("提现处理异常: openid={}, transferNo={}", openid, transferNo, e);
-                handleTransferFailed(openid, withdrawId, transferNo, amountFen);
-                throw new BusinessException("提现处理异常, 请稍后重试");
-            } else {
-                // 接口无响应: 阶梯延时查询
-                log.warn("转账接口无响应, 开始阶梯延时查询: openid={}, transferNo={}", openid, transferNo, e);
-                queryAndHandlerTransferWithBackoff(withdrawId,openid, transferNo, amountFen);
-            }
+            log.error("转账接口无响应",e);
+            // 接口无响应: 阶梯延时查询
+            log.warn("转账接口无响应, 开始阶梯延时查询: openid={}, transferNo={}", openid, transferNo, e);
+            new Thread(() -> {
+                queryAndHandlerTransferWithBackoff(withdrawId,openid, transferNo, amountFen,false);
+            }).start();
+            return "提现中";
         }
     }
 
-    public void queryAndHandlerTransferWithBackoff(Long withdrawId,String openid, String transferNo,int amountFen)
+    public String queryAndHandlerTransferWithBackoff(Long withdrawId,String openid,
+                                                     String transferNo,int amountFen,boolean retry)
             throws BusinessException {
         String queryResult = queryTransferWithBackoff(transferNo);
         if ("SUCCESS".equals(queryResult)) {
             handleTransferSuccess(openid, withdrawId, transferNo, amountFen);
             log.info("延时查询确认转账成功: openid={}, transferNo={}", openid, transferNo);
+            return "提现成功";
         } else if ("FAIL".equals(queryResult)) {
             handleTransferFailed(openid, withdrawId, transferNo, amountFen);
-            throw new BusinessException("提现失败, 微信返回: FAIL");
+            return "提现失败";
         } else {
+            if (retry) {
+                if("ACCEPTED".equals(queryResult) || "PROCESSING".equals(queryResult)) {
+                    //todo 发起原单重试
+                }
+            }
             // 仍不确定: 标记为待人工处理
             log.error("阶梯延时查询仍无法确认转账状态: openid={}, transferNo={}", openid, transferNo);
             withdrawMapper.updateTransferNo(openid, withdrawId, transferNo, 1); // 保持处理中
-            throw new BusinessException("转账接口无响应且查询超时, 已标记处理中, 请稍后或联系管理员");
+            return "提现中";
         }
     }
 
@@ -278,6 +289,7 @@ public class IncomeService {
      * @return "SUCCESS" / "FAIL" / "UNKNOWN"
      */
     private String queryTransferWithBackoff(String transferNo) {
+        String status = null;
         for (int i = 0; i < RETRY_INTERVALS_MS.length; i++) {
             try {
                 Thread.sleep(RETRY_INTERVALS_MS[i]);
@@ -286,18 +298,16 @@ public class IncomeService {
 
                 if ("SUCCESS".equals(resp.get("return_code"))
                         && "SUCCESS".equals(resp.get("result_code"))) {
-                    String status = resp.get("transfer_status");
-                    if ("SUCCESS".equals(status)) {
-                        return "SUCCESS";
-                    } else if ("FAIL".equals(status)) {
-                        return "FAIL";
+                    status = resp.get("transfer_status");
+                    if ("SUCCESS".equals(status) || "FAIL".equals(status)) {
+                        return status;
                     }
                 }
             } catch (Exception e) {
                 log.warn("第{}次查询转账状态异常 transferNo={}", i + 1, transferNo, e);
             }
         }
-        return "UNKNOWN";
+        return status;
     }
 
     public void handleTransferSuccess(String openid, Long withdrawId, String transferNo, int amountFen) {

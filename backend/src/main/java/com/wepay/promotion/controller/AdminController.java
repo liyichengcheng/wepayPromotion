@@ -58,6 +58,7 @@ public class AdminController {
 
     /** 审核通过提现申请 */
     @PostMapping("/withdraw/approve")
+    @Deprecated
     public Result<Void> approve(@RequestBody Map<String, Object> body) {
         String openid = (String) body.get("openid");
         Long withdrawId = getLong(body, "withdrawId");
@@ -87,8 +88,8 @@ public class AdminController {
             Withdraw withdraw = withdrawMapper.selectById(openid,withdrawId);
             String transferNo = withdraw.getTransferNo();
             int amountFen = withdraw.getAmount();
-            incomeService.queryAndHandlerTransferWithBackoff(withdrawId,openid, transferNo, amountFen);
-            return Result.success("成功查询");
+            String result = incomeService.queryAndHandlerTransferWithBackoff(withdrawId,openid, transferNo, amountFen,true);
+            return Result.success(result);
         } catch (Exception e) {
             throw new BusinessException("查询转账状态失败: " + e.getMessage());
         }

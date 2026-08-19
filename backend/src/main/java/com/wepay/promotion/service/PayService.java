@@ -110,6 +110,7 @@ public class PayService {
         return WxPayUtil.buildJsapiPayInfo(wxConfig.getMiniapp().getAppid(), prepayId, wxConfig.getPay().getMchKey());
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public String handleNotify(String xmlRaw) {
         Map<String, String> params;
         try {
@@ -168,7 +169,6 @@ public class PayService {
      * 微信支付回调处理
      * 注: 已付费状态仅通过 Redis 缓存(30天TTL)维护
      */
-    @Transactional(rollbackFor = Exception.class)
     public String handleNotify2(String orderNo,String transactionId,String openid) {
         // 支付回调只有 order_no 没有分片键 openid:
         // ShardingSphere standard 策略的 SELECT 缺少分片键时自动广播到
