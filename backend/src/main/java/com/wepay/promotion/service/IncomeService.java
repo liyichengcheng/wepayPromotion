@@ -141,8 +141,7 @@ public class IncomeService {
 
         // 以 openid 为粒度加分布式锁, 防止并发提交提现请求
         String lockKey = String.format(WITHDRAW_LOCK_KEY, openid);
-        Boolean locked = redis.opsForValue()
-                .setIfAbsent(lockKey, "1", WITHDRAW_RATE_LIMIT_HOURS, TimeUnit.HOURS);
+        Boolean locked = redis.opsForValue().setIfAbsent(lockKey, "1", WITHDRAW_RATE_LIMIT_HOURS, TimeUnit.HOURS);
         if (null == locked || Boolean.FALSE.equals(locked)) {
             return "每小时只能提现一次, 请稍后再试";
         }
