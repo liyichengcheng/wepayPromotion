@@ -5,10 +5,8 @@ import com.wepay.promotion.dto.ApplyWithdrawRequest;
 import com.wepay.promotion.dto.IncomeSummaryVO;
 import com.wepay.promotion.interceptor.AuthInterceptor;
 import com.wepay.promotion.service.IncomeService;
-import com.wepay.promotion.service.RealNameService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
@@ -19,11 +17,9 @@ import java.util.Map;
 @RequestMapping("/income")
 public class IncomeController {
     private final IncomeService incomeService;
-    private final RealNameService realNameService;
 
-    public IncomeController(IncomeService incomeService, RealNameService realNameService) {
+    public IncomeController(IncomeService incomeService) {
         this.incomeService = incomeService;
-        this.realNameService = realNameService;
     }
 
     /**
@@ -112,22 +108,5 @@ public class IncomeController {
             log.error("处理免确认授权通知异常", e);
             return "{\"code\":\"FAIL\",\"message\":\"" + e.getMessage() + "\"}";
         }
-    }
-
-    /**
-     * 提交实名认证信息 (需登录)
-     * 用户累计提现达阈值后, 需提交姓名/手机号/身份证号 + 身份证正反面图片
-     * 管理员审核通过后(status→1)方可继续提现
-     * Content-Type: multipart/form-data
-     */
-    @PostMapping("/submitRealName")
-    public Result<String> submitRealName(@RequestParam String name,
-                                         @RequestParam String phoneNo,
-                                         @RequestParam String idcardNo,
-                                         @RequestParam("frontImg") MultipartFile frontImg,
-                                         @RequestParam("backImg") MultipartFile backImg,
-                                         HttpServletRequest request) {
-        String openid = (String) request.getAttribute(AuthInterceptor.CURRENT_OPENID);
-        return Result.success(realNameService.submitRealName(openid, name, phoneNo, idcardNo, frontImg, backImg));
     }
 }
