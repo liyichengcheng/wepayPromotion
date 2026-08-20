@@ -4,22 +4,23 @@ App({
     userId: wx.getStorageSync("userId") || "",
     shareUid: "",
     articleId: 10001,
-    currentPrice: 100,
+    currentPrice: 0.2,
     totalPayUser: 0,
     isLoginReady: false,
+    isPayUnlock: false,
     loginCallbacks: [],
     isDevMode: false,
     shareLink: ""
   },
   $request: request,
-
   calcPrice(payUserCount) {
-    const basePrice = 6
-    const maxPrice = 20
-    if (payUserCount <= 1000) return basePrice
-    const exceed = payUserCount - 1000
-    const addPrice = Math.ceil(exceed / 10000)
-    return Math.min(basePrice + addPrice, maxPrice)
+    const basePrice = 0.01
+    const maxPrice = 0.05
+    
+    if (payUserCount <= 2) return basePrice
+    const exceed = payUserCount - 2
+    const addPrice = Math.ceil(exceed / 2)
+    return Math.min(basePrice + addPrice * 0.01, maxPrice)
   },
 
   calcCommission(price) {
@@ -75,7 +76,7 @@ App({
       this.globalData.isLoginReady = true
       this.globalData.loginCallbacks.forEach(cb => cb(res.data.openid))
       this.globalData.loginCallbacks = []
-      this.checkPayStatus()
+      await this.checkPayStatus()
     } catch (err) {
       console.log("登录失败，使用本地用户", err)
       const localUserId = wx.getStorageSync("userId") || "local_user_" + Date.now()
@@ -116,9 +117,10 @@ App({
         data: { articleId: this.globalData.articleId }
       })
       const paid = res.data.paid
+      this.globalData.isPayUnlock = paid
       wx.setStorageSync("hasReadArticle", paid)
       if (!paid) {
-        this.getArticlePayCount()
+        await this.getArticlePayCount()
       }
     } catch (e) {
       console.error("检查支付状态失败", e)

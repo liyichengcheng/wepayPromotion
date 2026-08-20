@@ -30,8 +30,6 @@ Page({
       progressPercent
     })
 
-    const hasReadArticle = wx.getStorageSync("hasReadArticle")
-    this.setData({ hasReadArticle: hasReadArticle })
     this.refreshPayStatus()
   },
 
@@ -39,6 +37,11 @@ Page({
     try {
       await app.waitLogin(3000)
       await app.checkPayStatus()
+      this.setData({
+        hasReadArticle: app.globalData.isPayUnlock,
+        price: app.globalData.currentPrice,
+        payCount: app.globalData.totalPayUser
+      })
     } catch (e) {
       console.error("刷新支付状态失败", e)
     }
@@ -52,11 +55,41 @@ Page({
     if (this.data.isPaying) {
       return
     }
+
     if (this.data.hasReadArticle) {
       wx.navigateTo({ url: "/pages/articleReadAll/articleReadAll" })
       return
     }
     this.setData({ showPayModal: true })
+    this.refreshPayTotal()
+  },
+
+  async refreshPayTotal() {
+    try {
+      await app.waitLogin(3000)
+      await app.getArticlePayCount()
+      this.setData({
+        price: app.globalData.currentPrice,
+        payCount: app.globalData.totalPayUser
+      })
+    } catch (e) {
+      console.error("刷新价格失败", e)
+    }
+  },
+
+  getDisplayPrice() {
+    return new Promise((resolve) => {
+      wx.createSelectorQuery().in(this)
+        .select(".pay-info-price")
+        .fields({ dataset: true }, (res) => {
+          if (res && res.dataset && res.dataset.price != null) {
+            const num = Number(res.dataset.price)
+            resolve(!isNaN(num) && num > 0 ? num : this.data.price)
+          } else {
+            resolve(this.data.price)
+          }
+        }).exec()
+    })
   },
 
   closePayModal() {
@@ -64,6 +97,7 @@ Page({
   },
 
   async confirmPay() {
+    const price = await this.getDisplayPrice()
     this.setData({ showPayModal: false })
     wx.showLoading({ title: "请稍候..." })
     try {
@@ -81,7 +115,7 @@ Page({
       wx.hideLoading()
       const articleId = app.globalData.articleId || 10001
       const shareUid = app.globalData.shareUid || ''
-      const payPrice = this.data.price * 100
+      const payPrice = price * 100
       this.setData({ isPaying: true })
       wx.showLoading({ title: "生成订单" })
       const res = await app.$request({
@@ -115,7 +149,7 @@ Page({
           }
           const articleId = app.globalData.articleId || 10001
           const shareUid = app.globalData.shareUid || ''
-          const payPrice = this.data.price
+          const payPrice = price * 100
           this.setData({ isPaying: true })
           wx.showLoading({ title: "创建订单" })
           const retryRes = await app.$request({
@@ -149,8 +183,8 @@ Page({
       signType: payInfo.signType,
       paySign: payInfo.paySign,
       success: () => {
-        wx.setStorageSync("hasReadArticle", true)
-        this.setData({ isPaying: false })
+        app.globalData.isPayUnlock = true
+        this.setData({ isPaying: false, hasReadArticle: true })
         wx.showToast({ title: "支付成功" })
         setTimeout(() => {
           wx.redirectTo({ url: "/pages/articleReadAll/articleReadAll" })

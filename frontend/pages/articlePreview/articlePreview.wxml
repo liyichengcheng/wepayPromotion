@@ -49,13 +49,13 @@
     <view class="pay-bottom-bar">
       <view class="pay-btn" bindtap="createPayOrder">
         <text wx:if="{{hasReadArticle}}">继续阅读</text>
-        <text wx:else>付款看全文</text>
+        <text wx:else>精读全文</text>
       </view>
     </view>
   </view>
 
   <!-- 确认支付弹窗 -->
-  <view class="modal-mask" wx:if="{{showPayModal}}" bindtap="closePayModal"></view>
+  <view class="modal-mask" wx:if="{{showPayModal}}"></view>
   <view class="pay-modal" wx:if="{{showPayModal}}">
     <view class="pay-modal-header">
       <text class="pay-modal-title">确认支付</text>
@@ -65,7 +65,7 @@
         <text class="pay-info-text">您是第</text>
         <text class="pay-info-num">{{payCount}}</text>
         <text class="pay-info-text">位读者，定价</text>
-        <text class="pay-info-price">¥{{price}}元</text>
+        <text class="pay-info-price" data-price="{{price}}">¥{{price}}元</text>
       </view>
       <view class="pay-info-sub">
         <text>初试定价6元，每增1万读者，加1元，最高20元。可转发，不可截图，拍照</text>
