@@ -1,0 +1,52 @@
+<view class="page">
+  <view class="nav-bar" style="padding-top: {{statusBarHeight}}px;">
+    <view class="nav-back" bindtap="goBack">
+      <text>←</text>
+    </view>
+    <view class="nav-title">个人中心</view>
+  </view>
+
+  <!-- 用户信息卡片 -->
+  <view class="user-card">
+    <view class="avatar">
+      <text class="avatar-icon">👤</text>
+    </view>
+    <view class="user-info">
+      <view class="user-name">{{userName}}</view>
+      <view class="user-id">ID: {{userId}}</view>
+    </view>
+  </view>
+
+  <!-- 功能菜单 -->
+  <view class="menu-card">
+    <view class="menu-item" bindtap="goShareIncome">
+      <view class="menu-icon">💰</view>
+      <view class="menu-content">
+        <text class="menu-label">分享赚钱</text>
+        <text class="menu-desc">查看收益与提现</text>
+      </view>
+      <view class="menu-arrow">›</view>
+    </view>
+
+    <view class="menu-divider"></view>
+
+    <!-- 免确认收款授权状态 -->
+    <view class="menu-item">
+      <view class="menu-icon">🔐</view>
+      <view class="menu-content">
+        <text class="menu-label">免确认收款</text>
+        <text class="menu-desc">提现时直接到账零钱</text>
+      </view>
+      <view class="auth-status {{transferAuthEffective ? 'auth-effective' : 'auth-none'}}">
+        <text>{{transferAuthEffective ? '已授权' : '未授权'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 操作区 -->
+  <view class="action-card">
+    <view wx:if="{{transferAuthEffective}}" class="action-item action-danger" bindtap="terminateAuth">
+      <text>解除免确认收款授权</text>
+    </view>
+  </view>
+</view>

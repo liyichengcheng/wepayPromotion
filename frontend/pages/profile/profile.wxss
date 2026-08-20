@@ -1,0 +1,169 @@
+.page {
+  padding: 0 24rpx 60rpx;
+  background-color: #f7f8fa;
+  min-height: 100vh;
+}
+
+.nav-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  z-index: 100;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.04);
+}
+
+.nav-back {
+  position: absolute;
+  left: 24rpx;
+  font-size: 36rpx;
+  color: #333;
+  padding: 12rpx 20rpx;
+}
+
+.nav-title {
+  font-size: 34rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+/* 用户信息卡片 */
+.user-card {
+  margin-top: 112rpx;
+  background: linear-gradient(135deg, #07c160, #0ad870);
+  border-radius: 24rpx;
+  padding: 40rpx;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 8rpx 30rpx rgba(7, 193, 96, 0.25);
+}
+
+.avatar {
+  width: 100rpx;
+  height: 100rpx;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 28rpx;
+  flex-shrink: 0;
+}
+
+.avatar-icon {
+  font-size: 56rpx;
+}
+
+.user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-name {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #ffffff;
+  margin-bottom: 8rpx;
+}
+
+.user-id {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.8);
+  word-break: break-all;
+}
+
+/* 菜单卡片 */
+.menu-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 0 36rpx;
+  margin-top: 24rpx;
+  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.06);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 32rpx 0;
+}
+
+.menu-icon {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  margin-right: 24rpx;
+  flex-shrink: 0;
+}
+
+.menu-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-label {
+  font-size: 30rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+.menu-desc {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 4rpx;
+}
+
+.menu-arrow {
+  font-size: 40rpx;
+  color: #ccc;
+  flex-shrink: 0;
+}
+
+.menu-divider {
+  height: 1rpx;
+  background: #f0f0f0;
+}
+
+.auth-status {
+  font-size: 26rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 20rpx;
+  flex-shrink: 0;
+}
+
+.auth-effective {
+  background: rgba(7, 193, 96, 0.1);
+  color: #07c160;
+}
+
+.auth-none {
+  background: rgba(153, 153, 153, 0.1);
+  color: #999;
+}
+
+/* 操作区 */
+.action-card {
+  margin-top: 24rpx;
+}
+
+.action-item {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 32rpx 36rpx;
+  text-align: center;
+  font-size: 30rpx;
+  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.06);
+}
+
+.action-danger {
+  color: #e53935;
+}

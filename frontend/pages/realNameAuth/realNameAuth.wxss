@@ -1,0 +1,271 @@
+.page {
+  padding: 0 24rpx 60rpx;
+  background-color: #f7f8fa;
+  min-height: 100vh;
+}
+
+.nav-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  z-index: 100;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.04);
+}
+
+.nav-back {
+  position: absolute;
+  left: 24rpx;
+  font-size: 36rpx;
+  color: #333;
+  padding: 12rpx 20rpx;
+}
+
+.nav-title {
+  font-size: 34rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.content {
+  margin-top: 112rpx;
+}
+
+.loading {
+  text-align: center;
+  color: #999;
+  font-size: 28rpx;
+  padding: 80rpx 0;
+}
+
+/* ============ 状态卡片 ============ */
+.status-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 56rpx 36rpx 40rpx;
+  text-align: center;
+  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.06);
+}
+
+.status-card.verified {
+  border-top: 8rpx solid #07c160;
+}
+
+.status-card.pending {
+  border-top: 8rpx solid #f97316;
+}
+
+.status-icon {
+  font-size: 80rpx;
+  margin-bottom: 16rpx;
+}
+
+.verified .status-icon {
+  color: #07c160;
+}
+
+.pending .status-icon {
+  color: #f97316;
+}
+
+.status-title {
+  font-size: 34rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 12rpx;
+}
+
+.status-desc {
+  font-size: 26rpx;
+  color: #999;
+  line-height: 1.6;
+  margin-bottom: 32rpx;
+}
+
+/* 已提交信息回显 */
+.info-card {
+  background: #f7f8fa;
+  border-radius: 16rpx;
+  padding: 8rpx 28rpx;
+  text-align: left;
+  margin-bottom: 24rpx;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #eee;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  width: 160rpx;
+  font-size: 28rpx;
+  color: #999;
+  flex-shrink: 0;
+}
+
+.info-value {
+  flex: 1;
+  font-size: 28rpx;
+  color: #333;
+}
+
+/* 身份证图片回显 */
+.preview-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+
+.preview-img {
+  width: 48%;
+  height: 240rpx;
+  border-radius: 16rpx;
+  background: #f7f8fa;
+}
+
+/* 客服提示 */
+.wechat-tip {
+  background: rgba(249, 115, 22, 0.1);
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  text-align: center;
+}
+
+.wechat-text {
+  font-size: 26rpx;
+  color: #f97316;
+  margin-bottom: 12rpx;
+}
+
+.wechat-wechat {
+  display: inline-block;
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #f97316;
+  padding: 8rpx 32rpx;
+  background: #fff;
+  border-radius: 12rpx;
+  border: 2rpx solid #f97316;
+}
+
+/* ============ 表单 ============ */
+.tip-card {
+  background: rgba(249, 115, 22, 0.1);
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 24rpx;
+}
+
+.tip-text {
+  font-size: 26rpx;
+  color: #f97316;
+  line-height: 1.6;
+}
+
+.form-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 0 36rpx;
+  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.06);
+}
+
+.form-item {
+  display: flex;
+  align-items: center;
+  padding: 32rpx 0;
+}
+
+.form-label {
+  width: 160rpx;
+  font-size: 30rpx;
+  color: #333;
+  flex-shrink: 0;
+}
+
+.form-input {
+  flex: 1;
+  font-size: 30rpx;
+  color: #333;
+}
+
+.form-divider {
+  height: 1rpx;
+  background: #f0f0f0;
+}
+
+.upload-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 32rpx 36rpx;
+  margin-top: 24rpx;
+  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.06);
+}
+
+.upload-title {
+  font-size: 30rpx;
+  color: #333;
+  font-weight: 500;
+  margin-bottom: 24rpx;
+}
+
+.upload-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.upload-item {
+  width: 48%;
+  height: 280rpx;
+  background: #f7f8fa;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.upload-img {
+  width: 100%;
+  height: 100%;
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.upload-icon {
+  font-size: 56rpx;
+  margin-bottom: 12rpx;
+}
+
+.upload-hint {
+  font-size: 26rpx;
+  color: #999;
+}
+
+.submit-btn {
+  margin-top: 40rpx;
+  height: 88rpx;
+  background: linear-gradient(90deg, #07c160, #0ad870);
+  border-radius: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  color: #ffffff;
+  font-weight: 500;
+  box-shadow: 0 8rpx 24rpx rgba(7, 193, 96, 0.3);
+}

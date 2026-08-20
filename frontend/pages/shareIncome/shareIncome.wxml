@@ -33,8 +33,13 @@
       <view class="stat-income">{{withdrawMoney}}</view>
       <view class="stat-unit">元</view>
       <view class="stat-sub">可提现</view>
-      <view class="withdraw-btn" bindtap="openWithdrawModal">
-        <text>提现</text>
+      <view class="withdraw-btn-group">
+        <view class="withdraw-btn" bindtap="openWithdrawModal">
+          <text>提现</text>
+        </view>
+        <view wx:if="{{transferAuthEffective}}" class="terminate-auth-btn" bindtap="terminateTransferAuth">
+          <text>解除授权</text>
+        </view>
       </view>
     </view>
   </view>
@@ -50,6 +55,34 @@
     <text>立即分享给好友</text>
   </button>
 
+  <!-- 授权引导弹窗 -->
+  <view class="modal-mask" wx:if="{{showAuthGuideModal}}" bindtap="closeAuthGuideModal"></view>
+  <view class="auth-guide-modal" wx:if="{{showAuthGuideModal}}">
+    <view class="auth-guide-header">
+      <text class="auth-guide-title">免确认收款授权</text>
+    </view>
+    <view class="auth-guide-body">
+      <view class="auth-guide-icon">
+        <text>🔐</text>
+      </view>
+      <view class="auth-guide-desc">
+        <text>授权免确认收款后，后续每次提现金额将直接到账微信零钱，无需手动确认。
+
+一次授权长期有效，直至您在微信钱包主动关闭。
+
+若不授权，每次提现需在微信服务通知中手动确认收款。</text>
+      </view>
+    </view>
+    <view class="auth-guide-footer">
+      <view class="auth-guide-cancel" bindtap="closeAuthGuideModal">
+        <text>稍后再说</text>
+      </view>
+      <view class="auth-guide-confirm" bindtap="goAuthorize">
+        <text>去授权</text>
+      </view>
+    </view>
+  </view>
+
   <!-- 提现弹窗 -->
   <view class="modal-mask" wx:if="{{showWithdrawModal}}" bindtap="closeWithdrawModal"></view>
   <view class="withdraw-modal" wx:if="{{showWithdrawModal}}">
@@ -58,15 +91,15 @@
     </view>
     <view class="withdraw-modal-body">
       <view class="withdraw-modal-notice">
-        <text>单笔大于500元及当日提现达到1000元后，经审核后3天内到账</text>
+        <text>单笔大于500元或当日累计达1000元需审核，审核后3天内到账。每小时只能提现一次。</text>
       </view>
       <view class="withdraw-input-row">
         <text class="withdraw-input-label">提现金额</text>
         <view class="withdraw-input-wrapper">
           <text class="withdraw-input-currency">¥</text>
-          <input class="withdraw-input" type="digit" placeholder="请输入提现金额" value="{{withdrawInput}}" bindinput="onWithdrawInput" />
+          <input class="withdraw-input" type="digit" placeholder="最低 0.1 元" value="{{withdrawInput}}" bindinput="onWithdrawInput" />
         </view>
-        <text class="withdraw-input-hint">最多可提现 ¥{{withdrawMoney}}</text>
+        <text class="withdraw-input-hint">最多可提现 ¥{{withdrawMoney}} · 最低 ¥0.1</text>
       </view>
     </view>
     <view class="withdraw-modal-footer">

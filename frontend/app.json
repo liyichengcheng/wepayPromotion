@@ -2,7 +2,9 @@
   "pages": [
     "pages/articlePreview/articlePreview",
     "pages/articleReadAll/articleReadAll",
-    "pages/shareIncome/shareIncome"
+    "pages/shareIncome/shareIncome",
+    "pages/profile/profile",
+    "pages/realNameAuth/realNameAuth"
   ],
   "window": {
     "backgroundTextStyle": "light",

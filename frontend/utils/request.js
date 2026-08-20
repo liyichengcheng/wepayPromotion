@@ -1,4 +1,4 @@
-const baseUrl = "http://127.0.0.1:8080/api";
+const baseUrl = "http://nj409uu6213.vicp.fun/api";
 const request = (options) => {
   return new Promise((resolve, reject) => {
     wx.request({
@@ -13,12 +13,16 @@ const request = (options) => {
         if (res.data.code === 200) {
           resolve(res.data)
         } else {
-          wx.showToast({ title: res.data.msg || "请求异常", icon: "none" })
+          if (!options.silent) {
+            wx.showToast({ title: res.data.msg || "请求异常", icon: "none" })
+          }
           reject(res.data)
         }
       },
       fail: err => {
-        wx.showToast({ title: "网络请求失败", icon: "none" })
+        if (!options.silent) {
+          wx.showToast({ title: "网络请求失败", icon: "none" })
+        }
         reject(err)
       }
     })

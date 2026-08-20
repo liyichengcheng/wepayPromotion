@@ -4,8 +4,7 @@ App({
     userId: wx.getStorageSync("userId") || "",
     shareUid: "",
     articleId: 10001,
-    isPayUnlock: false,
-    currentPrice: 1,
+    currentPrice: 100,
     totalPayUser: 0,
     isLoginReady: false,
     loginCallbacks: [],
@@ -15,11 +14,11 @@ App({
   $request: request,
 
   calcPrice(payUserCount) {
-    const basePrice = 1
+    const basePrice = 6
     const maxPrice = 20
     if (payUserCount <= 1000) return basePrice
     const exceed = payUserCount - 1000
-    const addPrice = Math.floor(exceed / 10000)
+    const addPrice = Math.ceil(exceed / 10000)
     return Math.min(basePrice + addPrice, maxPrice)
   },
 
@@ -90,11 +89,10 @@ App({
 
   onLaunch(options) {
     if (options.query && options.query.shareUid) {
-      this.globalData.shareUid = options.query.shareUid
+       this.globalData.shareUid = options.query.shareUid
     }
     this.login()
     this.banCaptureScreen()
-    this.getArticlePayCount()
   },
 
   async getArticlePayCount() {
@@ -118,9 +116,9 @@ App({
         data: { articleId: this.globalData.articleId }
       })
       const paid = res.data.paid
-      this.globalData.isPayUnlock = paid
-      if (paid) {
-        wx.setStorageSync("hasReadArticle", true)
+      wx.setStorageSync("hasReadArticle", paid)
+      if (!paid) {
+        this.getArticlePayCount()
       }
     } catch (e) {
       console.error("检查支付状态失败", e)

@@ -4,8 +4,8 @@
       <text class="search-icon">🔍</text>
       <text class="search-placeholder">搜索文章、作者、话题</text>
     </view>
-    <view class="search-action">
-      <text>📖</text>
+    <view class="search-action" bindtap="goProfile">
+      <text>👤</text>
     </view>
   </view>
 
@@ -48,8 +48,8 @@
     </view>
     <view class="pay-bottom-bar">
       <view class="pay-btn" bindtap="createPayOrder">
-        <text wx:if="{{!hasReadArticle}}">付款看全文</text>
-        <text wx:else>继续阅读</text>
+        <text wx:if="{{hasReadArticle}}">继续阅读</text>
+        <text wx:else>付款看全文</text>
       </view>
     </view>
   </view>
@@ -68,7 +68,7 @@
         <text class="pay-info-price">¥{{price}}元</text>
       </view>
       <view class="pay-info-sub">
-        <text>每增加1万读者，加1元，最高20元。可转发，不可截图，拍照</text>
+        <text>初试定价6元，每增1万读者，加1元，最高20元。可转发，不可截图，拍照</text>
       </view>
     </view>
     <view class="pay-modal-footer">

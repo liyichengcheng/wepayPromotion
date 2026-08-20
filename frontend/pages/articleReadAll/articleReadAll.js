@@ -47,7 +47,6 @@ Page({
         if (res.data.paid) {
           hasAccess = true
           wx.setStorageSync("hasReadArticle", true)
-          app.globalData.isPayUnlock = true
         }
       } catch (e) {
         console.error("验证支付状态失败", e)

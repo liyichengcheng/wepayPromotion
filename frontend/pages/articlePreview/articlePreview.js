@@ -1,12 +1,12 @@
 const app = getApp()
 Page({
   data: {
-    price: 1,
-    payCount: 912,
+    price: 6,
+    payCount: 0,
     progressPercent: 9.12,
     isPaying: false,
     hasReadArticle: false,
-    showPayModal: true,
+    showPayModal: false,
     evidenceImages: [
       'http://www.chsl.xyz/xlrz/images/evidence/1.png',
       'http://www.chsl.xyz/xlrz/images/evidence/2.png',
@@ -21,9 +21,9 @@ Page({
       app.globalData.shareUid = options.shareUid
     }
 
-    const price = app.globalData.currentPrice || 6
-    const payCount = app.globalData.totalPayUser || 912
-    const progressPercent = Math.min((payCount / 1000) * 100, 100)
+    const price = app.globalData.currentPrice
+    const payCount = app.globalData.totalPayUser
+    const progressPercent = Math.min((payCount / 10000) * 100, 100)
     this.setData({
       price,
       payCount,
@@ -31,7 +31,7 @@ Page({
     })
 
     const hasReadArticle = wx.getStorageSync("hasReadArticle")
-    this.setData({ hasReadArticle: !!hasReadArticle })
+    this.setData({ hasReadArticle: hasReadArticle })
     this.refreshPayStatus()
   },
 
@@ -39,22 +39,23 @@ Page({
     try {
       await app.waitLogin(3000)
       await app.checkPayStatus()
-      this.setData({ hasReadArticle: app.globalData.isPayUnlock })
     } catch (e) {
       console.error("刷新支付状态失败", e)
     }
+  },
+
+  goProfile() {
+    wx.navigateTo({ url: "/pages/profile/profile" })
   },
 
   createPayOrder() {
     if (this.data.isPaying) {
       return
     }
-
     if (this.data.hasReadArticle) {
       wx.navigateTo({ url: "/pages/articleReadAll/articleReadAll" })
       return
     }
-
     this.setData({ showPayModal: true })
   },
 
@@ -80,7 +81,7 @@ Page({
       wx.hideLoading()
       const articleId = app.globalData.articleId || 10001
       const shareUid = app.globalData.shareUid || ''
-      const payPrice = this.data.price
+      const payPrice = this.data.price * 100
       this.setData({ isPaying: true })
       wx.showLoading({ title: "生成订单" })
       const res = await app.$request({
@@ -149,7 +150,6 @@ Page({
       paySign: payInfo.paySign,
       success: () => {
         wx.setStorageSync("hasReadArticle", true)
-        app.globalData.isPayUnlock = true
         this.setData({ isPaying: false })
         wx.showToast({ title: "支付成功" })
         setTimeout(() => {

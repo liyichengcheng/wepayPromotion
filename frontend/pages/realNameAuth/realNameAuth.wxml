@@ -1,0 +1,105 @@
+<view class="page">
+  <view class="nav-bar" style="padding-top: {{statusBarHeight}}px;">
+    <view class="nav-back" bindtap="goBack">
+      <text>←</text>
+    </view>
+    <view class="nav-title">实名认证</view>
+  </view>
+
+  <view class="content">
+    <block wx:if="{{infoLoaded}}">
+      <!-- 已实名认证: status=1 -->
+      <view wx:if="{{realNameStatus === 1}}" class="status-card verified">
+        <view class="status-icon">✓</view>
+        <view class="status-title">已经实名认证</view>
+        <view class="status-desc">您已完成实名认证，可继续提现</view>
+      </view>
+
+      <!-- 已提交待审核: status=0 且已提交 -->
+      <view wx:elif="{{submitted}}" class="status-card pending">
+        <view class="status-icon">⏳</view>
+        <view class="status-title">实名信息审核中</view>
+        <view class="status-desc">您的实名信息已提交，等待审核通过后可继续提现</view>
+
+        <!-- 回显已提交信息 -->
+        <view class="info-card">
+          <view class="info-row">
+            <text class="info-label">姓名</text>
+            <text class="info-value">{{savedName}}</text>
+          </view>
+          <view class="info-row">
+            <text class="info-label">手机号</text>
+            <text class="info-value">{{savedPhone}}</text>
+          </view>
+          <view class="info-row">
+            <text class="info-label">身份证号</text>
+            <text class="info-value">{{savedIdcard}}</text>
+          </view>
+        </view>
+
+        <!-- 回显身份证图片 -->
+        <view class="preview-row" wx:if="{{savedFrontImg || savedBackImg}}">
+          <image wx:if="{{savedFrontImg}}" class="preview-img" src="{{savedFrontImg}}" mode="aspectFill" />
+          <image wx:if="{{savedBackImg}}" class="preview-img" src="{{savedBackImg}}" mode="aspectFill" />
+        </view>
+
+        <!-- 客服提示 -->
+        <view class="wechat-tip">
+          <view class="wechat-text">请添加客服微信为好友，加快审核进度</view>
+          <view class="wechat-wechat" bindtap="copyWechat">{{customerWechat}}</view>
+        </view>
+      </view>
+
+      <!-- 未提交: 显示表单 -->
+      <block wx:else>
+        <view class="tip-card">
+          <text class="tip-text">为保障资金安全，累计提现达阈值后需完成实名认证，审核通过后即可继续提现。</text>
+        </view>
+
+        <view class="form-card">
+          <view class="form-item">
+            <text class="form-label">真实姓名</text>
+            <input class="form-input" type="text" placeholder="请输入2-25个汉字" maxlength="25" value="{{name}}" bindinput="onInputName" />
+          </view>
+          <view class="form-divider"></view>
+          <view class="form-item">
+            <text class="form-label">手机号</text>
+            <input class="form-input" type="number" placeholder="请输入11位手机号" maxlength="11" value="{{phoneNo}}" bindinput="onInputPhone" />
+          </view>
+          <view class="form-divider"></view>
+          <view class="form-item">
+            <text class="form-label">身份证号</text>
+            <input class="form-input" type="idcard" placeholder="请输入身份证号" maxlength="18" value="{{idcardNo}}" bindinput="onInputIdcard" />
+          </view>
+        </view>
+
+        <view class="upload-card">
+          <view class="upload-title">身份证照片</view>
+          <view class="upload-row">
+            <view class="upload-item" bindtap="chooseFront">
+              <image wx:if="{{frontImg}}" class="upload-img" src="{{frontImg}}" mode="aspectFill" />
+              <view wx:else class="upload-placeholder">
+                <text class="upload-icon">📷</text>
+                <text class="upload-hint">人像面</text>
+              </view>
+            </view>
+            <view class="upload-item" bindtap="chooseBack">
+              <image wx:if="{{backImg}}" class="upload-img" src="{{backImg}}" mode="aspectFill" />
+              <view wx:else class="upload-placeholder">
+                <text class="upload-icon">📷</text>
+                <text class="upload-hint">国徽面</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="submit-btn" bindtap="submit">
+          <text>提交认证</text>
+        </view>
+      </block>
+    </block>
+
+    <!-- 加载中 -->
+    <view wx:else class="loading">加载中...</view>
+  </view>
+</view>
