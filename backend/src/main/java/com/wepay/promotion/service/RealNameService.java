@@ -14,7 +14,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 实名认证服务
@@ -172,6 +175,31 @@ public class RealNameService {
             }
         }
         return null;
+    }
+
+    /**
+     * 获取当前用户实名信息 + 身份证图片(base64)
+     * 前端加载实名页时回显已提交的信息和图片
+     * @param openid 用户openid
+     * @return Map: name/phoneNo/idcardNo/status/frontImg/backImg(后两者为base64, 无则null)
+     */
+    public Map<String, Object> getRealNameInfo(String openid) {
+        User user = userMapper.selectByOpenid(openid);
+        Map<String, Object> data = new HashMap<>();
+        if (user == null) {
+            data.put("status", 0);
+            return data;
+        }
+        data.put("name", user.getName());
+        data.put("phoneNo", user.getPhoneNo());
+        data.put("idcardNo", user.getIdcardNo());
+        data.put("status", user.getStatus() == null ? 0 : user.getStatus());
+        // 身份证图片转 base64 回显 (小程序 image 支持 data:image/jpeg;base64,xxx)
+        byte[] front = loadIdcardImage(openid, 1);
+        byte[] back = loadIdcardImage(openid, 2);
+        data.put("frontImg", front != null ? Base64.getEncoder().encodeToString(front) : null);
+        data.put("backImg", back != null ? Base64.getEncoder().encodeToString(back) : null);
+        return data;
     }
 
     /** 从原始文件名提取扩展名 (含.), 如 .jpg / .png, 无扩展名时返回空字符串 */

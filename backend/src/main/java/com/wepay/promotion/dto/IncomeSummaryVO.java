@@ -10,6 +10,6 @@ public class IncomeSummaryVO {
     private String todayIncome;
     /** 可提现金额(元) */
     private String withdrawable;
-    /** 今日推广人数 */
+    /** 推广人数 */
     private Integer todayCount;
 }

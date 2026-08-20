@@ -439,7 +439,7 @@ function renderUserTable(list) {
         const hasIdcard = item.idcardNo ? true : false;
         html += `<tr>
             <td>${item.id || '-'}</td>
-            <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:12px;" title="${openid}">${openid ? openid.substring(0,16)+'...' : '-'}</td>
+            <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:12px;" title="${openid}">${openid ? openid : '-'}</td>
             <td>${item.name || '-'}</td>
             <td>${item.phoneNo || '-'}</td>
             <td style="font-family:monospace;font-size:12px;">${item.idcardNo || '-'}</td>

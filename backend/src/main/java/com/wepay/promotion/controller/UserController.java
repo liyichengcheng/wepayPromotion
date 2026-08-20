@@ -50,13 +50,26 @@ public class UserController {
      * Content-Type: multipart/form-data
      */
     @PostMapping("/submitRealName")
-    public Result<String> submitRealName(@RequestParam String name,
-                                         @RequestParam String phoneNo,
-                                         @RequestParam String idcardNo,
-                                         @RequestParam("frontImg") MultipartFile frontImg,
-                                         @RequestParam("backImg") MultipartFile backImg,
+    public Result<String> submitRealName(@RequestParam(required = true) String name,
+                                         @RequestParam(required = true) String phoneNo,
+                                         @RequestParam(required = true) String idcardNo,
+                                         @RequestParam(value = "frontImg", required = true) MultipartFile frontImg,
+                                         @RequestParam(value = "backImg", required = true) MultipartFile backImg,
                                          HttpServletRequest request) {
         String openid = (String) request.getAttribute(AuthInterceptor.CURRENT_OPENID);
         return Result.success(realNameService.submitRealName(openid, name, phoneNo, idcardNo, frontImg, backImg));
+    }
+
+    /**
+     * 获取当前用户实名信息 + 身份证图片base64 (需登录)
+     * 前端加载实名页时回显:
+     *   status=1 已认证 → 不可再提交, 提示可继续提现
+     *   status=0 且有name 已提交待审核 → 提示添加客服微信
+     *   status=0 且无name 未提交 → 显示表单
+     */
+    @GetMapping("/realNameInfo")
+    public Result<Map<String, Object>> realNameInfo(HttpServletRequest request) {
+        String openid = (String) request.getAttribute(AuthInterceptor.CURRENT_OPENID);
+        return Result.success(realNameService.getRealNameInfo(openid));
     }
 }
