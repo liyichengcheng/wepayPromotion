@@ -48,17 +48,13 @@ public class UserController {
      * 用户累计提现达阈值后, 需提交姓名/手机号/身份证号 + 身份证正反面图片
      * 管理员审核通过后(status→1)方可继续提现
      * Content-Type: multipart/form-data
-     * <p>
-     * 小程序 wx.uploadFile 每次只能上传一个文件, 故拆分为两步:
-     * 第1步: name/phoneNo/idcardNo + frontImg (backImg 缺失) → 校验信息, 存人像面, 返回"请继续上传国徽面"
-     * 第2步: backImg (其余字段可空) → 存国徽面, 返回最终成功提示
      */
     @PostMapping("/submitRealName")
-    public Result<String> submitRealName(@RequestParam(required = true) String name,
-                                         @RequestParam(required = true) String phoneNo,
-                                         @RequestParam(required = true) String idcardNo,
-                                         @RequestParam(value = "frontImg", required = true) MultipartFile frontImg,
-                                         @RequestParam(value = "backImg", required = true) MultipartFile backImg,
+    public Result<String> submitRealName(@RequestParam String name,
+                                         @RequestParam String phoneNo,
+                                         @RequestParam String idcardNo,
+                                         @RequestParam("frontImg") MultipartFile frontImg,
+                                         @RequestParam("backImg") MultipartFile backImg,
                                          HttpServletRequest request) {
         String openid = (String) request.getAttribute(AuthInterceptor.CURRENT_OPENID);
         return Result.success(realNameService.submitRealName(openid, name, phoneNo, idcardNo, frontImg, backImg));

@@ -75,7 +75,7 @@ admin:
 idcard:
   # 身份证图片存储目录
   upload-dir: D:/Users/clinton/Downloads/idcard
-  # 实名认证阈值(分): 累计提现达此值时强制实名, 3000元=300000分
-  real-name-threshold-fen: 300000
+  # 实名认证阈值(分): 累计提现达此值时强制实名, 3000元=300000分  todo
+  real-name-threshold-fen: 30
   # 客服微信号 (用户提交实名信息后提示添加)
   customer-wechat: java_cex
