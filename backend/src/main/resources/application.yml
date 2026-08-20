@@ -71,6 +71,13 @@ logging:
 admin:
   password: admin123
 
+# 文章定价策略 (单位:分, 1分=0.01元)
+pay:
+  price:
+    base-fen: 1        # 基础价, 付费人数≤step-count时此价
+    max-fen: 5         # 封顶价
+    step-count: 2      # 步长: ≤此值返回基础价, 超过后每增加此值人数加1分
+
 # 实名认证配置
 idcard:
   # 身份证图片存储目录

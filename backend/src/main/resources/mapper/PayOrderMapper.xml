@@ -45,4 +45,16 @@
         SET status = 1, transaction_id = #{transactionId}, pay_time = #{payTime}
         WHERE openid = #{openid} AND order_no = #{orderNo} AND status = 0
     </update>
+
+    <!--
+      按物理表名查询 article_id 分组计数
+      直接查物理表 ${table} (t_pay_order_0~3), 绕过 ShardingSphere 逻辑表 t_pay_order 的路由
+      单库多表分片场景下, 物理表名直接透传到 ds0, 结果正确
+      返回 Map key: articleId (驼峰转换), cnt
+    -->
+    <select id="countGroupByArticleId" resultType="java.util.Map">
+        SELECT article_id AS articleId, count(1) AS cnt
+        FROM ${table}
+        GROUP BY article_id
+    </select>
 </mapper>

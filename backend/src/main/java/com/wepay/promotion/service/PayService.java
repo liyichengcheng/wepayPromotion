@@ -1,6 +1,7 @@
 package com.wepay.promotion.service;
 
 import com.wepay.promotion.common.BusinessException;
+import com.wepay.promotion.config.PriceConfig;
 import com.wepay.promotion.config.WxConfig;
 import com.wepay.promotion.dto.CreateOrderRequest;
 import com.wepay.promotion.dto.PayInfoVO;
@@ -8,8 +9,6 @@ import com.wepay.promotion.entity.PayOrder;
 import com.wepay.promotion.entity.User;
 import com.wepay.promotion.mapper.PayOrderMapper;
 import com.wepay.promotion.mapper.UserMapper;
-import com.wepay.promotion.mq.WxPaySuccessMessage;
-import com.wepay.promotion.mq.WxPaySuccessProducer;
 import com.wepay.promotion.util.WxPayUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -47,11 +46,13 @@ public class PayService {
     private final ArticleService articleService;
     private final CommissionService commissionService;
     private final UserService userService;
+    private final PriceConfig priceConfig;
 
     public PayService(PayOrderMapper payOrderMapper, UserMapper userMapper,
                       WxPayService wxPayService, StringRedisTemplate redis,
                       WxConfig wxConfig, ArticleService articleService,
-                      CommissionService commissionService, UserService userService) {
+                      CommissionService commissionService, UserService userService,
+                      PriceConfig priceConfig) {
         this.payOrderMapper = payOrderMapper;
         this.userMapper = userMapper;
         this.wxPayService = wxPayService;
@@ -60,6 +61,7 @@ public class PayService {
         this.articleService = articleService;
         this.commissionService = commissionService;
         this.userService = userService;
+        this.priceConfig = priceConfig;
     }
 
     public PayInfoVO createOrder(String openid, CreateOrderRequest req) {
@@ -70,8 +72,14 @@ public class PayService {
         Long articleId = req.getArticleId() == null ? 10001L : req.getArticleId();
         int payPrice = req.getPayPrice() == null ? 600 : req.getPayPrice();
 
-        String orderNo = "po_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
+        // 校验前端传入价格: 低于当前应付价格则视为过期, 需刷新页面重新获取
+        int totalPayUser = (int) articleService.getPayTotal(articleId).get("totalPayUser");
+        int expectedPriceFen = calcPrice(totalPayUser);
+        if (payPrice < expectedPriceFen) {
+            throw new BusinessException("价格已过期，请刷新页面重新支付");
+        }
 
+        String orderNo = "po_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
         PayOrder order = new PayOrder();
         order.setOrderNo(orderNo);
         order.setOpenid(openid);
@@ -231,5 +239,23 @@ public class PayService {
 
     private String notifyFail(String msg) {
         return "<xml><return_code><![CDATA[FAIL]]></return_code><return_msg><![CDATA[" + msg + "]]></return_msg></xml>";
+    }
+
+    /**
+     * 计算文章应付价格(分), 与前端 app.js calcPrice(payUserCount) 逻辑一致
+     * 基础价/封顶价/步长均从 application.yml pay.price.* 读取
+     * - 付费人数 ≤ stepCount: 返回 baseFen
+     * - 超过 stepCount 后, 每增加 stepCount 人(向上取整)加1分, 不超过 maxFen
+     */
+    private int calcPrice(int payUserCount) {
+        int baseFen = priceConfig.getBaseFen();
+        int maxFen = priceConfig.getMaxFen();
+        int stepCount = priceConfig.getStepCount();
+        if (payUserCount <= stepCount) {
+            return baseFen;
+        }
+        int exceed = payUserCount - stepCount;
+        int addPrice = (int) Math.ceil((double) exceed / stepCount);
+        return Math.min(baseFen + addPrice, maxFen);
     }
 }

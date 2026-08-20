@@ -47,7 +47,7 @@
     <update id="markWithdrawFailed">
         UPDATE t_commission_summary
         SET pending_amount = pending_amount - #{amount}, update_time = NOW()
-        WHERE openid = #{openid}
+        WHERE openid = #{openid} and pending_amount >= #{amount}
     </update>
 
     <!-- 可提现余额 = 总 - 已提现 - 提现中 -> 带分片键 openid, 精准路由 -->

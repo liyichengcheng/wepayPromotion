@@ -7,6 +7,7 @@ import com.wepay.promotion.mapper.UserMapper;
 import com.wepay.promotion.util.RealNameValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -47,9 +48,9 @@ public class RealNameService {
      * @param backImg     身份证背面图片
      * @return 提示语
      */
+    @Transactional(rollbackFor = Exception.class)
     public String submitRealName(String openid, String name, String phoneNo, String idcardNo,
                                  MultipartFile frontImg, MultipartFile backImg) {
-        // 1. 格式校验
         if (!RealNameValidator.isValidName(name)) {
             throw new BusinessException("姓名格式不正确(2-25个汉字)");
         }
@@ -66,12 +67,17 @@ public class RealNameService {
             throw new BusinessException("请上传身份证背面照片");
         }
 
+        // 3. 更新 t_user 表 (status 保持不变, 等待管理员审核)
+        int rows = userMapper.updateRealNameInfo(openid, name, phoneNo, idcardNo);
+        if (rows < 1) {
+            throw new BusinessException("用户不存在或者已经实名认证, 更新失败");
+        }
+
         // 2. 保存身份证图片 (保留原格式)
         String frontExt = getExtension(frontImg.getOriginalFilename());
         String backExt = getExtension(backImg.getOriginalFilename());
         String frontFileName = idcardNo + "_1" + frontExt;
         String backFileName = idcardNo + "_2" + backExt;
-
         Path uploadPath = Paths.get(idcardConfig.getUploadDir());
         try {
             if (!Files.exists(uploadPath)) {
@@ -83,12 +89,6 @@ public class RealNameService {
         } catch (IOException e) {
             log.error("身份证图片保存失败: openid={}", openid, e);
             throw new BusinessException("图片保存失败, 请重试");
-        }
-
-        // 3. 更新 t_user 表 (status 保持不变, 等待管理员审核)
-        int rows = userMapper.updateRealNameInfo(openid, name, phoneNo, idcardNo);
-        if (rows < 1) {
-            throw new BusinessException("用户不存在, 更新失败");
         }
 
         // 4. 返回提示

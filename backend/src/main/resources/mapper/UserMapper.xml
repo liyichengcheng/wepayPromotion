@@ -68,7 +68,7 @@
             phone_no = #{phoneNo},
             idcard_no = #{idcardNo},
             update_time = CURRENT_TIMESTAMP
-        WHERE openid = #{openid}
+        WHERE openid = #{openid} and status != 1
     </update>
 
     <!--
