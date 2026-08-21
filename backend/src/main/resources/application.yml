@@ -62,10 +62,9 @@ wx:
   share:
     aes-key: 2ShAYqaH/y1octey6WKr0w==
 
+# 日志配置见 logback-spring.xml (按级别+日期分文件输出到 logs/ 目录)
 logging:
-  level:
-    com.wepay.promotion: debug
-    org.apache.shardingsphere: debug
+  config: classpath:logback-spring.xml
 
 # 管理员后台密码 (Basic Auth)
 admin:
