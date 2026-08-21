@@ -76,10 +76,11 @@ Page({
   },
 
   onShareAppMessage() {
+    console.log("shareLink1:"+app.globalData.shareLink)
     return {
       title: "学渣逆袭：高考倒状元到百万年薪，快来看看吧！",
       path: app.globalData.shareLink,
-      imageUrl: ""
+      imageUrl: "http://www.chsl.xyz/xlrz/images/sharePreview.png"
     }
   },
 

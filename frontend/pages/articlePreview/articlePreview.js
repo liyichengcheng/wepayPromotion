@@ -29,7 +29,7 @@ Page({
       payCount,
       progressPercent
     })
-
+    console.log("shareLink3:"+app.globalData.shareUid)
     this.refreshPayStatus()
   },
 

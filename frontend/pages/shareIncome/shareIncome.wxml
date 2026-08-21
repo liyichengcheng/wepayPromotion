@@ -24,8 +24,6 @@
     </view>
     <view class="stat-divider"></view>
     <view class="stat-item">
-      <view class="stat-income">{{todayIncome}}</view>
-      <view class="stat-unit">元/人</view>
       <view class="stat-sub">今日推广 {{todayCount}} 人</view>
     </view>
     <view class="stat-divider"></view>
@@ -67,9 +65,7 @@
       </view>
       <view class="auth-guide-desc">
         <text>授权免确认收款后，后续每次提现金额将直接到账微信零钱，无需手动确认。
-
 一次授权长期有效，直至您在微信钱包主动关闭。
-
 若不授权，每次提现需在微信服务通知中手动确认收款。</text>
       </view>
     </view>
