@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- 日志根目录 -->
+    <property name="LOG_HOME" value="logs"/>
+
+    <!-- 控制台输出 (所有级别, 彩色) -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) [%thread] %cyan(%logger{36}) - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 总日志文件 (所有级别, 按日期分文件) -->
+    <appender name="ALL_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/app-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>365</maxHistory>
+            <totalSizeCap>50GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- ERROR 级别单独日志文件 (按日期分文件) -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/error/error-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>60</maxHistory>
+            <totalSizeCap>20GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 项目业务代码日志级别 -->
+    <logger name="com.wepay.promotion" level="DEBUG"/>
+    <!-- ShardingSphere 日志级别 -->
+    <logger name="org.apache.shardingsphere" level="DEBUG"/>
+    <!-- 第三方框架降低级别, 避免过多 debug 日志 -->
+    <logger name="org.springframework" level="INFO"/>
+    <logger name="org.mybatis" level="INFO"/>
+    <logger name="com.zaxxer.hikari" level="INFO"/>
+
+    <!-- 生产环境: root=INFO, 无控制台 -->
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="ALL_FILE"/>
+            <appender-ref ref="ERROR_FILE"/>
+        </root>
+    </springProfile>
+
+    <!-- 开发/默认环境: root=DEBUG, 含控制台 -->
+    <springProfile name="dev">
+        <root level="DEBUG">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ALL_FILE"/>
+            <appender-ref ref="ERROR_FILE"/>
+        </root>
+    </springProfile>
+
+    <!-- 默认环境 (未指定 profile 时), 同 dev -->
+    <springProfile name="default">
+        <root level="DEBUG">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ALL_FILE"/>
+            <appender-ref ref="ERROR_FILE"/>
+        </root>
+    </springProfile>
+</configuration>
